@@ -28,6 +28,9 @@ class DataProcessor:
             self.temporary : pd.DataFrame = None
             self.temporary_annotation : str = None
     
+    """
+    Data handling methods
+    """
     def merge_tables(self, cli = None, mol = None) -> None:
         """
         Merges molecular, clinical, and target data on the 'ID' column.
@@ -51,6 +54,10 @@ class DataProcessor:
         warnings.warn("The temporary attribute dataframe has been deleted, refer to treated data.", FutureWarning)
         return self.treated_data
     
+    """ 
+    Statistical overview methods
+    """
+
     def show(self) -> None:
         """
         Display the current format of the Data, if merged table is not created, show individual dataframes.
@@ -66,6 +73,56 @@ class DataProcessor:
             print("Merged Data table : ")
             print(self.merged_table.head())
 
+    def get_data_shapes(self) -> tuple:
+            """
+            Returns the shapes of the molecular, clinical, and target datasets.
+            """
+            return (self.molecular_data.shape, self.clinical_data.shape, self.target_data.shape)
+    
+    def get_summary_statistics(self) -> Dict[str, pd.DataFrame]:
+        """
+        Returns summary statistics for molecular, clinical, and target datasets.
+        """
+        return {
+            "molecular_data": self.molecular_data.describe(),
+            "clinical_data": self.clinical_data.describe(),
+            "target_data": self.target_data.describe()
+        }
+
+
+    def get_missing_values(self) -> Dict[str, pd.DataFrame]:
+        """
+        Returns the percentage of missing values for each column in the datasets.
+        """
+        return {
+            "molecular_data": self.molecular_data.isnull().mean() * 100,
+            "clinical_data": self.clinical_data.isnull().mean() * 100,
+            "target_data": self.target_data.isnull().mean() * 100
+        }
+
+    def get_column_types(self) -> Dict[str, pd.Series]:
+        """
+        Returns the data types of columns in each dataset.
+        """
+        return {
+            "molecular_data": self.molecular_data.dtypes,
+            "clinical_data": self.clinical_data.dtypes,
+            "target_data": self.target_data.dtypes
+        } 
+    def get_unique_values(self) -> Dict[str, pd.Series]:
+        """
+        Returns the number of unique values for each column in the datasets.
+        """
+        return {
+            "molecular_data": self.molecular_data.nunique(),
+            "clinical_data": self.clinical_data.nunique(),
+            "target_data": self.target_data.nunique()
+        }
+
+
+    """
+    Feature engineering methods
+    """
     def add_danger(self):
         """
         Adds a 'DANGER' column to the molecular data by multiplying 'VAF' and 'DEPTH'.
@@ -146,50 +203,4 @@ class DataProcessor:
         self.clinical_data["CYTO_CATEGORY"] = self.clinical_data[column_name].apply(self.classify_cytogenetics)
         self.clinical_data.drop("CYTOGENETICS", axis=1, inplace=True)
         return self.clinical_data
-
-    def get_data_shapes(self) -> tuple:
-            """
-            Returns the shapes of the molecular, clinical, and target datasets.
-            """
-            return (self.molecular_data.shape, self.clinical_data.shape, self.target_data.shape)
-    
-    def get_summary_statistics(self) -> Dict[str, pd.DataFrame]:
-        """
-        Returns summary statistics for molecular, clinical, and target datasets.
-        """
-        return {
-            "molecular_data": self.molecular_data.describe(),
-            "clinical_data": self.clinical_data.describe(),
-            "target_data": self.target_data.describe()
-        }
-
-
-    def get_missing_values(self) -> Dict[str, pd.DataFrame]:
-        """
-        Returns the percentage of missing values for each column in the datasets.
-        """
-        return {
-            "molecular_data": self.molecular_data.isnull().mean() * 100,
-            "clinical_data": self.clinical_data.isnull().mean() * 100,
-            "target_data": self.target_data.isnull().mean() * 100
-        }
-
-    def get_column_types(self) -> Dict[str, pd.Series]:
-        """
-        Returns the data types of columns in each dataset.
-        """
-        return {
-            "molecular_data": self.molecular_data.dtypes,
-            "clinical_data": self.clinical_data.dtypes,
-            "target_data": self.target_data.dtypes
-        } 
-    def get_unique_values(self) -> Dict[str, pd.Series]:
-        """
-        Returns the number of unique values for each column in the datasets.
-        """
-        return {
-            "molecular_data": self.molecular_data.nunique(),
-            "clinical_data": self.clinical_data.nunique(),
-            "target_data": self.target_data.nunique()
-        }
 
