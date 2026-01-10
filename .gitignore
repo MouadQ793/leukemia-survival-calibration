@@ -1,0 +1,15 @@
+# Exclude pickle model files
+*.pkl
+__pycache__/
+*.pyc
+.DS_Store
+
+# Exclude large data files
+*.xlsx
+data/
+model_calibrated/
+model_calibrated_isotonic/
+results/
+
+# Exclude large intermediate files
+imputer/
