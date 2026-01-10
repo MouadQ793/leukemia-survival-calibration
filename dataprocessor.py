@@ -38,6 +38,28 @@ class DataProcessor:
         self.merged_table = self.molecular_data.merge(self.clinical_data,on="ID",how="left"
                                                                 ).merge(self.target_data,on="ID",how="left")    
     
+    def remove_columns(self, columns: list, data_type: str = "molecular") -> None:
+        """
+        Removes specified columns from either molecular or clinical data.
+
+        :param columns: List of column names to remove.
+        :param data_type: The type of data to remove columns from ('molecular' or 'clinical').
+        :raises ValueError: If data_type is not 'molecular' or 'clinical'.
+        :raises ValueError: If any column doesn't exist in the specified data.
+        """
+        if data_type.lower() == "molecular":
+            for col in columns:
+                if col not in self.molecular_data.columns:
+                    raise ValueError(f"Column '{col}' not found in molecular data.")
+            self.molecular_data = self.molecular_data.drop(columns=columns)
+        elif data_type.lower() == "clinical":
+            for col in columns:
+                if col not in self.clinical_data.columns:
+                    raise ValueError(f"Column '{col}' not found in clinical data.")
+            self.clinical_data = self.clinical_data.drop(columns=columns)
+        else:
+            raise ValueError("data_type must be 'molecular' or 'clinical'.")
+    
     def save_data(self, file_path: str = "data/treated_data.csv") -> pd.DataFrame:
         """
         Saves the treated data to a CSV file in the 'data' directory and returns it.
@@ -53,6 +75,7 @@ class DataProcessor:
         self.treated_data.to_csv(file_path, index=False)
         warnings.warn("The temporary attribute dataframe has been deleted, refer to treated data.", FutureWarning)
         return self.treated_data
+    
     
     """ 
     Statistical overview methods
@@ -77,7 +100,7 @@ class DataProcessor:
             """
             Returns the shapes of the molecular, clinical, and target datasets.
             """
-            return (self.molecular_data.shape, self.clinical_data.shape, self.target_data.shape)
+            return (f"the molecular data shape: {self.molecular_data.shape}, clinical data shape: {self.clinical_data.shape}, target data shape: {self.target_data.shape}")
     
     def get_summary_statistics(self) -> Dict[str, pd.DataFrame]:
         """
@@ -202,5 +225,28 @@ class DataProcessor:
 
         self.clinical_data["CYTO_CATEGORY"] = self.clinical_data[column_name].apply(self.classify_cytogenetics)
         self.clinical_data.drop("CYTOGENETICS", axis=1, inplace=True)
+        return self.clinical_data
+
+    def create_cytogenetics_dummies(self, column_name: str = "CYTO_CATEGORY", drop_original: bool = True) -> pd.DataFrame:
+        """
+        Creates dummy variables from the cytogenetics classification column.
+
+        :param column_name: The name of the cytogenetics classification column (default: 'CYTO_CATEGORY').
+        :param drop_original: Whether to drop the original classification column after creating dummies (default: True).
+        :return: The updated clinical DataFrame with dummy variables.
+        """
+        if column_name not in self.clinical_data.columns:
+            raise ValueError(f"Column '{column_name}' not found in clinical data.")
+
+        # Create dummy variables with prefix to avoid column name conflicts
+        cyto_dummies = pd.get_dummies(self.clinical_data[column_name], prefix="CYTO")
+        
+        # Concatenate the dummy variables to the clinical data
+        self.clinical_data = pd.concat([self.clinical_data, cyto_dummies], axis=1)
+        
+        # Drop the original column if specified
+        if drop_original:
+            self.clinical_data.drop(column_name, axis=1, inplace=True)
+        
         return self.clinical_data
 
