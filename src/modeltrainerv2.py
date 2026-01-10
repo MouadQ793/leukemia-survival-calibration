@@ -122,7 +122,7 @@ class ModelML():
             'best_params': search.best_params_,
             'cv_results': search.cv_results_
         }
-        self. model_name = 'LogisticRegression_tuned'
+        self.model_name = 'LogisticRegression_tuned'
         self.training_date = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Predictions

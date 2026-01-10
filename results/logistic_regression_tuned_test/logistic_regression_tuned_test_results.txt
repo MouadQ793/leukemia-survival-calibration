@@ -1,0 +1,17 @@
+
+============================================================
+🔍 ÉVALUATION COMPLÈTE:  logistic_regression_tuned_test
+============================================================
+
+Accuracy: 0.7055
+Balanced_Accuracy: 0.7051
+Precision: 0.6674
+Recall_Sensitivity: 0.7002
+Specificity: 0.7099
+F1_Score: 0.6834
+Matthews_Corr_Coef: 0.4088
+Cohen_Kappa: 0.4084
+ROC_AUC: 0.7768
+PR_AUC: 0.7305
+Brier_Score: 0.1927
+Log_Loss: 0.5675

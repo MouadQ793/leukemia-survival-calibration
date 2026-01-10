@@ -1,374 +1,520 @@
+# =============================================================================
+# MODEL TRAINER - Complete Version
+# =============================================================================
+import os
+import joblib
+import json
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+from datetime import datetime
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from typing import Optional, Dict, Any
-import warnings
-import itertools
-import seaborn as sns
-import matplotlib.pyplot as plt
-import numpy as np
-from numpy.typing import NDArray
-import random
-from sklearn.svm import SVC
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-from sklearn.isotonic import IsotonicRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix, classification_report, mean_squared_error, brier_score_loss
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 
-# ========================================================================
-# Model class
-# ========================================================================
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+    print("⚠️ XGBoost non installé.  Installez avec:  pip install xgboost")
 
-class model_ml():
+
+class ModelML: 
     
-    def __init__(self,x , y ):
-        self.x = x 
-        self.y = y 
-        self.x_test = None
-        self.y_test = None 
-        self.x_train = None
-        self.y_train = None 
-        self.y_test_pred = None
-        self.y_train_pred = None 
+    def __init__(self, x_train=None, x_test=None, y_train=None, y_test=None):
+        """Initialize the model trainer with optional pre-split data."""
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_test = x_test
+        self.y_test = y_test
+        self. y_test_pred = None
+        self.y_train_pred = None
+        self.y_test_proba = None
+        self.y_train_proba = None
         self.model = None
+        self.model_name = None
+        self.training_date = None
+        self.best_params = None
+        self.cv_results = None
+    
+    # =========================================================================
+    # PRIVATE METHODS
+    # =========================================================================
+    def _validate_data(self):
+        """Check that training data is available."""
+        if self.x_train is None or self.y_train is None:
+            raise ValueError("Les données d'entraînement ne sont pas définies.")
+    
+    def _post_training(self, model_name, params):
+        """Common operations after training."""
+        self.model_name = model_name
+        self.training_date = datetime. now().strftime("%Y%m%d_%H%M%S")
+        self.best_params = params
         
-    def split_set(self):
-        self.x_train,self.x_test,self.y_train,self.y_test = train_test_split(self.x, self.y, test_size=0.2 , random_state = 42)
+        # Predictions on train
+        self.y_train_pred = self.model.predict(self.x_train)
+        if hasattr(self.model, 'predict_proba'):
+            self.y_train_proba = self.model.predict_proba(self.x_train)[:, 1]
         
-    def metrics(self,set : str): 
-        if set is "train" : 
-            return {
-                'Accuracy': accuracy_score(self.y_train, self.y_train_pred),
-                'Precision': precision_score(self.y_train, self.y_train_pred, average='weighted', zero_division=0),
-                'Recall': recall_score(self.y_train, self.y_train_pred, average='weighted', zero_division=0),
-                'F1-Score': f1_score(self.y_train, self.y_train_pred, average='weighted', zero_division=0),
-          }
-        elif set is "test" : 
-            return {
-                'Accuracy': accuracy_score(self.y_test, self.y_test_pred),
-                'Precision': precision_score(self.y_test, self.y_test_pred, average='weighted', zero_division=0),
-                'Recall': recall_score(self.y_test, self.y_test_pred, average='weighted', zero_division=0),
-                'F1-Score': f1_score(self.y_test, self.y_test_pred, average='weighted', zero_division=0),
-          }
-        else : 
-            raise ValueError("Choissisez Train ou Test dans la méthode ")
+        # Predictions on test
+        if self.x_test is not None:
+            self.y_test_pred = self.model. predict(self.x_test)
+            if hasattr(self.model, 'predict_proba'):
+                self.y_test_proba = self.model.predict_proba(self.x_test)[:, 1]
         
-    def logistic_regression(self, standardize=True, max_iter=1000, random_state=42):
-        """
-        Effectue une régression logistique sur les données.
+        self._print_metrics()
+    
+    def _print_metrics(self):
+        """Print quick accuracy metrics."""
+        train_acc = np.mean(self.y_train_pred == self.y_train)
+        print(f"\n📊 Résultats:")
+        print(f"   - Train Accuracy: {train_acc:.4f}")
+        if self.y_test is not None and self.y_test_pred is not None:
+            test_acc = np.mean(self. y_test_pred == self. y_test)
+            print(f"   - Test Accuracy:  {test_acc:.4f}")
+    
+    def _tune_model(self, base_model, param_grid, method, cv, scoring, n_iter, model_name):
+        """Generic method for hyperparameter tuning."""
         
-        Parameters:
-        -----------
-        standardize : bool, default=True
-            Si True, standardise les features avant l'entraînement
-        max_iter : int, default=1000
-            Nombre maximum d'itérations pour la convergence
-        random_state : int, default=42
-            Graine aléatoire pour la reproductibilité
+        method_upper = method.upper()
+        print(f"\n🔍 Recherche d'hyperparamètres ({method_upper})")
+        print(f"   Modèle: {model_name}")
+        print(f"   Scoring: {scoring}")
+        print(f"   CV folds:  {cv}")
+        print(f"   Paramètres testés: {list(param_grid. keys())}")
         
-        Returns:
-        --------
-        dict : Dictionnaire contenant le modèle et les métriques
-        """
-        
-        # Vérifier que les données sont divisées
-        if self.x_train is None or self.x_test is None:
-            print("Division des données en cours...")
-            self.split_set()
-        
-        # Vérifier si y est binaire, sinon le convertir
-        unique_values = np.unique(self.y)
-        if len(unique_values) > 2:
-            # Si c'est continu, créer une variable binaire (médiane comme seuil)
-            median_threshold = np.median(self.y)
-            y_binary = (self.y > median_threshold).astype(int)
-            y_train_binary = (self.y_train > median_threshold).astype(int)
-            y_test_binary = (self.y_test > median_threshold).astype(int)
-            print(f"Variable cible convertie en binaire avec seuil médian: {median_threshold:.3f}")
-            print(f"Distribution des classes: {np.bincount(y_binary)}")
+        if method_upper == 'GRID':
+            search = GridSearchCV(
+                base_model,
+                param_grid,
+                cv=cv,
+                scoring=scoring,
+                n_jobs=-1,
+                verbose=1
+            )
+        elif method_upper == 'RANDOM':
+            search = RandomizedSearchCV(
+                base_model,
+                param_grid,
+                n_iter=n_iter,
+                cv=cv,
+                scoring=scoring,
+                n_jobs=-1,
+                verbose=1,
+                random_state=42
+            )
         else:
-            y_train_binary = self.y_train.astype(int)
-            y_test_binary = self.y_test.astype(int)
+            raise ValueError("method doit être 'grid' ou 'random'")
         
-        # Standardisation des features
-        if standardize:
-            self.scaler = StandardScaler()
-            x_train_processed = self.scaler.fit_transform(self.x_train)
-            x_test_processed = self.scaler.transform(self.x_test)
-        else:
-            x_train_processed = self.x_train
-            x_test_processed = self.x_test
+        search.fit(self.x_train, self. y_train)
         
-        # Entraînement du modèle
-        self.logistic_model = LogisticRegression(
-            random_state=random_state, 
-            max_iter=max_iter
-        )
-        self.logistic_model.fit(x_train_processed, y_train_binary)
-        
-        # Prédictions
-        self.y_train_pred = self.logistic_model.predict(x_train_processed)
-        self.y_test_pred = self.logistic_model.predict(x_test_processed)
-        
-        # Probabilités pour ROC-AUC
-        y_train_proba = self.logistic_model.predict_proba(x_train_processed)[:, 1]
-        y_test_proba = self.logistic_model.predict_proba(x_test_processed)[:, 1]
-        
-        # Métriques avec ROC-AUC
-        train_metrics = {
-            'Accuracy': accuracy_score(y_train_binary, self.y_train_pred),
-            'Precision': precision_score(y_train_binary, self.y_train_pred, average='weighted', zero_division=0),
-            'Recall': recall_score(y_train_binary, self.y_train_pred, average='weighted', zero_division=0),
-            'F1-Score': f1_score(y_train_binary, self.y_train_pred, average='weighted', zero_division=0),
-            'ROC-AUC': roc_auc_score(y_train_binary, y_train_proba) if len(np.unique(y_train_binary)) > 1 else 0
+        self.model = search.best_estimator_
+        self.best_params = search.best_params_
+        self.cv_results = {
+            'best_score':  search.best_score_,
+            'best_params': search. best_params_,
+            'cv_results': search.cv_results_
         }
         
-        test_metrics = {
-            'Accuracy': accuracy_score(y_test_binary, self.y_test_pred),
-            'Precision': precision_score(y_test_binary, self.y_test_pred, average='weighted', zero_division=0),
-            'Recall': recall_score(y_test_binary, self.y_test_pred, average='weighted', zero_division=0),
-            'F1-Score': f1_score(y_test_binary, self.y_test_pred, average='weighted', zero_division=0),
-            'ROC-AUC': roc_auc_score(y_test_binary, y_test_proba) if len(np.unique(y_test_binary)) > 1 else 0
+        print(f"\n✓ Meilleurs paramètres trouvés:")
+        for param, value in self.best_params.items():
+            print(f"   - {param}:  {value}")
+        print(f"   - Best CV Score ({scoring}): {search.best_score_:.4f}")
+        
+        self._post_training(model_name, self.best_params)
+    
+    # =========================================================================
+    # LOGISTIC REGRESSION
+    # =========================================================================
+    def train_logistic_regression(self, **lr_params):
+        """
+        Train a Logistic Regression model. 
+        
+        :param lr_params: Parameters for LogisticRegression
+        : return: self (for method chaining)
+        """
+        self._validate_data()
+        
+        default_params = {
+            'max_iter': 1000,
+            'random_state': 42
         }
+        default_params.update(lr_params)
         
-        # Tableau de comparaison
-        comparison_df = pd.DataFrame({
-            'Métrique': list(train_metrics.keys()),
-            'Train': [f"{v:.4f}" for v in train_metrics.values()],
-            'Test': [f"{v:.4f}" for v in test_metrics.values()]
-        })
+        print(f"\n🔄 Entraînement Logistic Regression")
+        print(f"   Paramètres: {default_params}")
         
-        # Différence pour détecter l'overfitting
-        comparison_df['Différence (Train-Test)'] = [
-            f"{train_metrics[metric] - test_metrics[metric]:.4f}" 
-            for metric in train_metrics.keys()
-        ]
+        self.model = LogisticRegression(**default_params)
+        self.model.fit(self.x_train, self. y_train)
         
-        print("=== RÉSULTATS DE LA RÉGRESSION LOGISTIQUE ===")
-        print(f"Taille du dataset: {len(self.x)} échantillons")
-        print(f"Nombre de features: {self.x.shape[1]}")
-        print(f"Train set: {len(self.x_train)} échantillons")
-        print(f"Test set: {len(self.x_test)} échantillons")
-        print("\n=== TABLEAU DE COMPARAISON ===")
-        print(comparison_df.to_string(index=False))
+        self._post_training('logistic_regression', default_params)
+        return self
+    
+    def tune_logistic_regression(self, param_grid=None, method='grid', cv=5, scoring='roc_auc', n_iter=50):
+        """
+        Tune Logistic Regression hyperparameters. 
         
-        # Matrices de confusion
-        print("\n=== MATRICES DE CONFUSION ===")
-        print("Train:")
-        print(confusion_matrix(y_train_binary, self.y_train_pred))
-        print("\nTest:")
-        print(confusion_matrix(y_test_binary, self.y_test_pred))
+        :param param_grid: Parameters to search (uses default if None)
+        :param method: 'grid' or 'random'
+        :param cv: Cross-validation folds
+        :param scoring: Metric to optimize ('accuracy', 'roc_auc', 'f1', etc.)
+        :param n_iter:  Iterations for random search
+        :return: self (for method chaining)
+        """
+        self._validate_data()
         
-        # Importance des features (coefficients)
-        if hasattr(self.x, 'columns'):
-            feature_names = self.x.columns
-        else:
-            feature_names = [f'Feature_{i}' for i in range(self.x.shape[1])]
+        if param_grid is None:
+            param_grid = {
+                'C': [0.001, 0.01, 0.1, 1, 10, 100],
+                'penalty': ['l1', 'l2'],
+                'solver': ['liblinear', 'saga'],
+                'class_weight': [None, 'balanced'],
+                'max_iter': [1000]
+            }
         
-        feature_importance = pd.DataFrame({
-            'Feature': feature_names,
-            'Coefficient': self.logistic_model.coef_[0],
-            'Abs_Coefficient': np.abs(self.logistic_model.coef_[0])
-        }).sort_values('Abs_Coefficient', ascending=False)
+        self._tune_model(
+            base_model=LogisticRegression(random_state=42),
+            param_grid=param_grid,
+            method=method,
+            cv=cv,
+            scoring=scoring,
+            n_iter=n_iter,
+            model_name='logistic_regression_tuned'
+        )
+        return self
+    
+    # =========================================================================
+    # RANDOM FOREST
+    # =========================================================================
+    def train_random_forest(self, **rf_params):
+        """
+        Train a Random Forest model.
         
-        print("\n=== IMPORTANCE DES FEATURES (Top 10) ===")
-        print(feature_importance.head(10).to_string(index=False))
+        : param rf_params: Parameters for RandomForestClassifier
+        :return: self (for method chaining)
+        """
+        self._validate_data()
         
-        # Rapport de classification détaillé
-        print("\n=== RAPPORT DE CLASSIFICATION (Test Set) ===")
-        print(classification_report(y_test_binary, self.y_test_pred))
-        
-        return {
-            'model': self.logistic_model,
-            'scaler': self.scaler if standardize else None,
-            'train_metrics': train_metrics,
-            'test_metrics': test_metrics,
-            'comparison_df': comparison_df,
-            'feature_importance': feature_importance,
-            'y_train_binary': y_train_binary,
-            'y_test_binary': y_test_binary,
-            'y_train_proba': y_train_proba,
-            'y_test_proba': y_test_proba
+        default_params = {
+            'n_estimators': 100,
+            'max_depth': None,
+            'min_samples_split': 2,
+            'min_samples_leaf': 1,
+            'random_state':  42,
+            'n_jobs': -1
         }
-
-    def plot_logistic_results(self):
-        """
-        Affiche des graphiques pour analyser les résultats de la régression logistique.
-        """
-        if not hasattr(self, 'logistic_model'):
-            print("Aucun modèle logistique trouvé. Exécutez d'abord logistic_regression().")
-            return
+        default_params.update(rf_params)
         
-        fig, axes = plt.subplots(2, 2, figsize=(15, 10))
+        print(f"\n🔄 Entraînement Random Forest")
+        print(f"   Paramètres: {default_params}")
         
-        # 1. Matrice de confusion
-        from sklearn.metrics import ConfusionMatrixDisplay
-        ConfusionMatrixDisplay.from_predictions(
-            self.y_test if hasattr(self, 'y_test_binary') else self.y_test, 
-            self.y_test_pred, 
-            ax=axes[0,0]
+        self. model = RandomForestClassifier(**default_params)
+        self.model.fit(self.x_train, self.y_train)
+        
+        self._post_training('random_forest', default_params)
+        return self
+    
+    def tune_random_forest(self, param_grid=None, method='random', cv=5, scoring='roc_auc', n_iter=50):
+        """
+        Tune Random Forest hyperparameters.
+        
+        :param param_grid: Parameters to search (uses default if None)
+        :param method: 'grid' or 'random'
+        :param cv: Cross-validation folds
+        :param scoring: Metric to optimize
+        :param n_iter:  Iterations for random search
+        :return: self (for method chaining)
+        """
+        self._validate_data()
+        
+        if param_grid is None:
+            param_grid = {
+                'n_estimators': [50, 100, 200, 300, 500],
+                'max_depth': [None, 10, 20, 30, 50],
+                'min_samples_split': [2, 5, 10],
+                'min_samples_leaf': [1, 2, 4],
+                'max_features': ['sqrt', 'log2', None],
+                'class_weight': [None, 'balanced']
+            }
+        
+        self._tune_model(
+            base_model=RandomForestClassifier(random_state=42, n_jobs=-1),
+            param_grid=param_grid,
+            method=method,
+            cv=cv,
+            scoring=scoring,
+            n_iter=n_iter,
+            model_name='random_forest_tuned'
         )
-        axes[0,0].set_title('Matrice de Confusion (Test Set)')
-        
-        # 2. Distribution des probabilités
-        y_test_proba = self.logistic_model.predict_proba(
-            self.scaler.transform(self.x_test) if hasattr(self, 'scaler') and self.scaler else self.x_test
-        )[:, 1]
-        
-        axes[0,1].hist(y_test_proba, bins=30, alpha=0.7, edgecolor='black')
-        axes[0,1].set_title('Distribution des Probabilités Prédites')
-        axes[0,1].set_xlabel('Probabilité')
-        axes[0,1].set_ylabel('Fréquence')
-        
-        # 3. Importance des features (top 10)
-        if hasattr(self.x, 'columns'):
-            feature_names = self.x.columns
-        else:
-            feature_names = [f'Feature_{i}' for i in range(self.x.shape[1])]
-        
-        coefficients = self.logistic_model.coef_[0]
-        top_indices = np.argsort(np.abs(coefficients))[-10:]
-        
-        axes[1,0].barh(range(10), coefficients[top_indices])
-        axes[1,0].set_yticks(range(10))
-        axes[1,0].set_yticklabels([feature_names[i] for i in top_indices])
-        axes[1,0].set_title('Top 10 Coefficients (Importance des Features)')
-        axes[1,0].set_xlabel('Coefficient')
-        
-        # 4. Courbe ROC
-        from sklearn.metrics import roc_curve, auc
-        y_test_binary = getattr(self, 'y_test_binary', self.y_test)
-        fpr, tpr, _ = roc_curve(y_test_binary, y_test_proba)
-        roc_auc = auc(fpr, tpr)
-        
-        axes[1,1].plot(fpr, tpr, color='darkorange', lw=2, 
-                    label=f'ROC curve (AUC = {roc_auc:.2f})')
-        axes[1,1].plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-        axes[1,1].set_xlim([0.0, 1.0])
-        axes[1,1].set_ylim([0.0, 1.05])
-        axes[1,1].set_xlabel('Taux de Faux Positifs')
-        axes[1,1].set_ylabel('Taux de Vrais Positifs')
-        axes[1,1].set_title('Courbe ROC')
-        axes[1,1].legend(loc="lower right")
-        
-        plt.tight_layout()
-        plt.show()
-
-    def isotonic_regression(self, x: Optional[NDArray[np.float64]] = None, y: Optional[NDArray[np.float64]] = None, model: str = "logistique", plot: bool = True):
+        return self
+    
+    # =========================================================================
+    # XGBOOST
+    # =========================================================================
+    def train_xgboost(self, **xgb_params):
         """
-        Predicts probabilities using the chosen base model, calibrates them using Isotonic Regression,
-        and compares the RMSE of the uncalibrated vs. calibrated probabilities.
+        Train an XGBoost model.
         
-        Data Split: 70% Train (Base), 20% Calibrate (Isotonic), 10% Test (Final Eval).
+        :param xgb_params: Parameters for XGBClassifier
+        :return: self (for method chaining)
         """
-        from sklearn.metrics import mean_squared_error, brier_score_loss
-
-        # 1. Preparation of Data
-        X_data = x if x is not None else self.x
-        Y_data = y if y is not None else self.y
+        if not XGBOOST_AVAILABLE:
+            raise ImportError("XGBoost non installé.  Installez avec: pip install xgboost")
         
-        # Handle continuous Y if necessary
-        if len(np.unique(Y_data)) > 2:
-            median_threshold = np.median(Y_data)
-            Y_binary = (Y_data > median_threshold).astype(int)
-            print(f"Isotonic: Variable cible convertie en binaire (Seuil: {median_threshold:.3f})")
-        else:
-            Y_binary = Y_data.astype(int)
-
-        # 2. Splitting the Data (70% Train, 20% Calibration, 10% Test)
-        # Step A: Split into (90% Temp) and (10% Final Test)
-        X_temp, X_test_final, y_temp, y_test_final = train_test_split(
-            X_data, Y_binary, test_size=0.10, random_state=42, stratify=Y_binary
-        )
+        self._validate_data()
         
-        # Step B: Split the 90% Temp into Train (70% total) and Calib (20% total)
-        # 0.20 (total) / 0.90 (temp) = approx 0.222
-        calib_size = 2/9
-        X_train_base, X_calib, y_train_base, y_calib = train_test_split(
-            X_temp, y_temp, test_size=calib_size, random_state=42, stratify=y_temp
-        )
-
-        print("\n=== SPLIT DES DONNÉES (ISOTONIC) ===")
-        print(f"1. Train Base Model (70%): {len(X_train_base)}")
-        print(f"2. Calibration Set (20%):  {len(X_calib)}")
-        print(f"3. Final Test Set (10%):   {len(X_test_final)}")
-
-        # 3. Train Base Model (Logistic)
-        scaler_iso = StandardScaler()
-        X_train_base_sc = scaler_iso.fit_transform(X_train_base)
-        X_calib_sc = scaler_iso.transform(X_calib)
-        X_test_final_sc = scaler_iso.transform(X_test_final)
-
-        base_clf = None
-        if model == "logistique":
-            base_clf = LogisticRegression(max_iter=1000, random_state=42)
-            base_clf.fit(X_train_base_sc, y_train_base)
-        else:
-            raise ValueError(f"Modèle '{model}' non supporté pour le moment.")
-
-        # 4. Get Uncalibrated Probabilities
-        probs_calib_uncalibrated = base_clf.predict_proba(X_calib_sc)[:, 1]
-        probs_test_uncalibrated = base_clf.predict_proba(X_test_final_sc)[:, 1]
-
-        # 5. Fit Isotonic Regression
-        iso_reg = IsotonicRegression(out_of_bounds='clip', y_min=0, y_max=1)
-        iso_reg.fit(probs_calib_uncalibrated, y_calib)
-
-        # 6. Transform Test Probabilities (Calibrate them)
-        probs_test_calibrated = iso_reg.transform(probs_test_uncalibrated)
-
-        # 7. Evaluation Metrics (Calculating RMSE)
-        # RMSE = Sqrt(Mean Squared Error)
-        
-        # Base (Logistic Only)
-        mse_base = mean_squared_error(y_test_final, probs_test_uncalibrated)
-        rmse_base = np.sqrt(mse_base)
-        
-        # Isotonic (Logistic + Calibration)
-        mse_iso = mean_squared_error(y_test_final, probs_test_calibrated)
-        rmse_iso = np.sqrt(mse_iso)
-
-        # Display Results Table
-        res_df = pd.DataFrame({
-            'Metric': ['RMSE (Lower is better)', 'MSE (Brier Score)'],
-            'Logistic (Uncalibrated)': [f"{rmse_base:.5f}", f"{mse_base:.5f}"],
-            'Isotonic (Calibrated)':   [f"{rmse_iso:.5f}", f"{mse_iso:.5f}"],
-            'Improvement': [f"{(rmse_base - rmse_iso):.5f}", f"{(mse_base - mse_iso):.5f}"]
-        })
-
-        print("\n=== COMPARAISON DES RÉSULTATS (TEST SET) ===")
-        print(res_df.to_string(index=False))
-
-        # 8. Plotting (Reliability Diagram)
-        if plot:
-            from sklearn.calibration import calibration_curve
-            plt.figure(figsize=(10, 6))
-            
-            # Base Model Curve
-            prob_true_base, prob_pred_base = calibration_curve(y_test_final, probs_test_uncalibrated, n_bins=10)
-            plt.plot(prob_pred_base, prob_true_base, marker='o', linewidth=1, label=f'Logistic (RMSE={rmse_base:.4f})', color='red')
-            
-            # Isotonic Curve
-            prob_true_iso, prob_pred_iso = calibration_curve(y_test_final, probs_test_calibrated, n_bins=10)
-            plt.plot(prob_pred_iso, prob_true_iso, marker='s', linewidth=1, label=f'Isotonic (RMSE={rmse_iso:.4f})', color='blue')
-            
-            plt.plot([0, 1], [0, 1], linestyle='--', color='gray', label='Perfectly Calibrated')
-            
-            plt.xlabel('Mean Predicted Probability')
-            plt.ylabel('Fraction of Positives')
-            plt.title('Reliability Diagram: Logistic vs Isotonic')
-            plt.legend()
-            plt.grid(True, alpha=0.3)
-            plt.show()
-
-        return {
-            'metrics': res_df,
-            'rmse_base': rmse_base,
-            'rmse_iso': rmse_iso,
-            'probs_uncalibrated': probs_test_uncalibrated,
-            'probs_calibrated': probs_test_calibrated,
-            'y_test': y_test_final
+        default_params = {
+            'n_estimators': 100,
+            'max_depth': 6,
+            'learning_rate': 0.1,
+            'subsample': 0.8,
+            'colsample_bytree': 0.8,
+            'random_state': 42,
+            'n_jobs': -1,
+            'eval_metric': 'logloss'
         }
+        default_params.update(xgb_params)
+        
+        print(f"\n🔄 Entraînement XGBoost")
+        print(f"   Paramètres: {default_params}")
+        
+        self. model = xgb.XGBClassifier(**default_params)
+        self.model.fit(self.x_train, self. y_train)
+        
+        self._post_training('xgboost', default_params)
+        return self
+    
+    def tune_xgboost(self, param_grid=None, method='random', cv=5, scoring='roc_auc', n_iter=50):
+        """
+        Tune XGBoost hyperparameters.
+        
+        :param param_grid: Parameters to search (uses default if None)
+        :param method: 'grid' or 'random'
+        :param cv: Cross-validation folds
+        :param scoring:  Metric to optimize
+        :param n_iter: Iterations for random search
+        :return: self (for method chaining)
+        """
+        if not XGBOOST_AVAILABLE:
+            raise ImportError("XGBoost non installé.  Installez avec: pip install xgboost")
+        
+        self._validate_data()
+        
+        if param_grid is None: 
+            param_grid = {
+                'n_estimators': [50, 100, 200, 300],
+                'max_depth': [3, 4, 5, 6, 8, 10],
+                'learning_rate': [0.01, 0.05, 0.1, 0.2],
+                'subsample': [0.6, 0.7, 0.8, 0.9, 1.0],
+                'colsample_bytree': [0.6, 0.7, 0.8, 0.9, 1.0],
+                'min_child_weight': [1, 3, 5],
+                'gamma': [0, 0.1, 0.2]
+            }
+        
+        self._tune_model(
+            base_model=xgb.XGBClassifier(random_state=42, n_jobs=-1, eval_metric='logloss'),
+            param_grid=param_grid,
+            method=method,
+            cv=cv,
+            scoring=scoring,
+            n_iter=n_iter,
+            model_name='xgboost_tuned'
+        )
+        return self
+    
+    # =========================================================================
+    # UPDATE HYPERPARAMETERS
+    # =========================================================================
+    def update_hyperparameters(self, model_type=None, **new_params):
+        """
+        Update hyperparameters and retrain the model.
+        
+        :param model_type: 'logistic', 'rf', 'xgboost' (auto-detected if None)
+        :param new_params: New hyperparameters to use
+        :return: self (for method chaining)
+        """
+        if self.best_params is None:
+            current_params = {}
+        else:
+            current_params = self.best_params. copy()
+        
+        # Update with new params
+        current_params.update(new_params)
+        
+        print(f"\n🔄 Mise à jour des hyperparamètres et ré-entraînement")
+        print(f"   Anciens:  {self.best_params}")
+        print(f"   Nouveaux:  {current_params}")
+        
+        # Auto-detect model type if not provided
+        if model_type is None:
+            if self.model_name is None:
+                raise ValueError("Aucun modèle précédent.  Spécifiez model_type='logistic', 'rf', ou 'xgboost'")
+            elif 'logistic' in self.model_name.lower():
+                model_type = 'logistic'
+            elif 'random' in self.model_name.lower() or 'forest' in self.model_name.lower():
+                model_type = 'rf'
+            elif 'xgb' in self.model_name.lower() or 'xgboost' in self.model_name.lower():
+                model_type = 'xgboost'
+            else:
+                raise ValueError(f"Type de modèle non reconnu: {self.model_name}")
+        
+        # Retrain with updated params
+        if model_type == 'logistic':
+            return self.train_logistic_regression(**current_params)
+        elif model_type == 'rf': 
+            return self.train_random_forest(**current_params)
+        elif model_type == 'xgboost':
+            return self.train_xgboost(**current_params)
+        else:
+            raise ValueError("model_type doit être 'logistic', 'rf', ou 'xgboost'")
+    
+    # =========================================================================
+    # PREDICTION METHODS
+    # =========================================================================
+    def predict(self, X):
+        """Make predictions."""
+        if self.model is None:
+            raise ValueError("Aucun modèle entraîné.")
+        return self.model.predict(X)
+    
+    def predict_proba(self, X):
+        """Get prediction probabilities."""
+        if self.model is None:
+            raise ValueError("Aucun modèle entraîné.")
+        if hasattr(self.model, 'predict_proba'):
+            return self.model.predict_proba(X)
+        raise AttributeError("Ce modèle ne supporte pas predict_proba()")
+    
+    # =========================================================================
+    # SAVE / LOAD
+    # =========================================================================
+    def save_model(self, filename=None, model_dir='models', save_params=True):
+        """
+        Save model and hyperparameters. 
+        
+        :param filename:  Name of the file (auto-generated if None)
+        :param model_dir: Directory to save the model (default: models)
+        :param save_params: If True, also save hyperparameters to JSON
+        :return: Path where model was saved
+        """
+        if self.model is None:
+            raise ValueError("Aucun modèle à sauvegarder.")
+        
+        os.makedirs(model_dir, exist_ok=True)
+        
+        if filename is None:
+            filename = f"{self.model_name}"
+        
+        filename = filename.replace('. pkl', '').replace('.json', '')
+        
+        # Save model directly in models/ directory
+        model_path = os.path.join(model_dir, f"{filename}.pkl")
+        joblib.dump(self.model, model_path)
+        print(f"✓ Modèle sauvegardé: {model_path}")
+        
+        # Save hyperparameters
+        if save_params and self.best_params:
+            params_path = os.path.join(model_dir, f"{filename}_params.json")
+            params_to_save = {
+                'model_name': self.model_name,
+                'training_date': self.training_date,
+                'hyperparameters': self.best_params,
+                'cv_best_score': self.cv_results. get('best_score') if self.cv_results else None
+            }
+            with open(params_path, 'w') as f:
+                json.dump(params_to_save, f, indent=4, default=str)
+            print(f"✓ Paramètres sauvegardés: {params_path}")
+        
+        return model_path
+    
+    def load_model(self, model_path, load_params=True):
+        """
+        Load model and hyperparameters.
+        
+        : param model_path: Path to the saved model file
+        :param load_params:  If True, also load hyperparameters from JSON
+        :return: self (for method chaining)
+        """
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Modèle non trouvé:  {model_path}")
+        
+        self.model = joblib.load(model_path)
+        self.model_name = type(self.model).__name__
+        print(f"✓ Modèle chargé: {model_path}")
+        
+        if load_params: 
+            params_path = model_path.replace('.pkl', '_params.json')
+            if os.path.exists(params_path):
+                with open(params_path, 'r') as f:
+                    params_data = json.load(f)
+                self.best_params = params_data.get('hyperparameters')
+                self.training_date = params_data.get('training_date')
+                self.model_name = params_data.get('model_name', self.model_name)
+                print(f"✓ Paramètres chargés: {self.best_params}")
+        
+        return self
+    
+    # =========================================================================
+    # UTILITY METHODS
+    # =========================================================================
+    def get_hyperparameters(self):
+        """Return current hyperparameters."""
+        if self.model is not None:
+            return self.model.get_params()
+        return self.best_params
+    
+    def get_feature_importance(self, feature_names=None):
+        """
+        Get feature importance (for RF and XGBoost).
+        
+        : param feature_names: List of feature names (optional)
+        :return: DataFrame with features and their importance
+        """
+        if self.model is None:
+            raise ValueError("Aucun modèle entraîné.")
+        
+        if hasattr(self.model, 'feature_importances_'):
+            importances = self.model.feature_importances_
+            
+            if feature_names is None:
+                feature_names = [f'feat_{i}' for i in range(len(importances))]
+            
+            importance_df = pd.DataFrame({
+                'feature': feature_names,
+                'importance': importances
+            }).sort_values('importance', ascending=False)
+            
+            return importance_df
+        
+        elif hasattr(self.model, 'coef_'):
+            # For Logistic Regression
+            coefs = np.abs(self.model.coef_[0])
+            
+            if feature_names is None: 
+                feature_names = [f'feat_{i}' for i in range(len(coefs))]
+            
+            importance_df = pd.DataFrame({
+                'feature': feature_names,
+                'importance': coefs
+            }).sort_values('importance', ascending=False)
+            
+            return importance_df
+        
+        else:
+            raise AttributeError("Ce modèle ne supporte pas feature_importances_ ou coef_")
+    
+    def summary(self):
+        """Print a summary of the current model state."""
+        print("\n" + "=" * 50)
+        print("📋 RÉSUMÉ DU MODÈLE")
+        print("=" * 50)
+        print(f"   Modèle: {self. model_name}")
+        print(f"   Date d'entraînement: {self.training_date}")
+        print(f"   Hyperparamètres: {self.best_params}")
+        if self.cv_results:
+            print(f"   CV Best Score: {self.cv_results.get('best_score', 'N/A'):.4f}")
+        if self.x_train is not None:
+            print(f"   Taille train: {len(self.x_train)}")
+        if self.x_test is not None:
+            print(f"   Taille test: {len(self.x_test)}")
+        print("=" * 50)

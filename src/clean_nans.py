@@ -15,7 +15,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(PROJECT_ROOT, 'data/processed_data.xlsx')
 STRATEGY = 'median'  # 'median' ou 'mean'
 COLS_TO_DROP = ['patient_ids', 'feat_40', 'feat_82']
-IMPUTER_PATH = os.path.join(PROJECT_ROOT, 'model/imputer.pkl')
+IMPUTER_PATH = os.path.join(PROJECT_ROOT, 'imputer/imputer.pkl')
 OUTPUT_PATH = os.path.join(PROJECT_ROOT, 'data/processed_data_imputed.xlsx')
 
 # =============================================================================
