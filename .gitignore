@@ -13,3 +13,4 @@ results/
 
 # Exclude large intermediate files
 imputer/
+report/

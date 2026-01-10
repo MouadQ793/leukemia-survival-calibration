@@ -1,0 +1,11 @@
+{
+    "model_name": "random_forest_tuned",
+    "training_date": "20260110_190307",
+    "hyperparameters": {
+        "n_estimators": 200,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "max_depth": null
+    },
+    "cv_best_score": 0.9572415312475584
+}

@@ -1,0 +1,11 @@
+{
+    "model_name": "logistic_regression_tuned",
+    "training_date": "20260110_132254",
+    "hyperparameters": {
+        "C": 0.1,
+        "class_weight": "balanced",
+        "penalty": "l2",
+        "solver": "liblinear"
+    },
+    "cv_best_score": 0.804599334313463
+}

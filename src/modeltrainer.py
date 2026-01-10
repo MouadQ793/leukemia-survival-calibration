@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 import glob
 try:
@@ -323,6 +323,73 @@ class ModelML:
         return self
     
     # =========================================================================
+    # GRADIENT BOOSTING DECISION TREE (sklearn)
+    # =========================================================================
+    def train_gradient_boosting(self, **gb_params):
+        """
+        Train a Gradient Boosting Decision Tree model (sklearn).
+        
+        :param gb_params: Parameters for GradientBoostingClassifier
+        :return: self (for method chaining)
+        """
+        self._validate_data()
+        
+        default_params = {
+            'n_estimators': 100,
+            'max_depth': 3,
+            'learning_rate': 0.1,
+            'subsample': 0.8,
+            'min_samples_split': 2,
+            'min_samples_leaf': 1,
+            'random_state': 42
+        }
+        default_params.update(gb_params)
+        
+        print(f"\n🔄 Entraînement Gradient Boosting DT")
+        print(f"   Paramètres: {default_params}")
+        
+        self.model = GradientBoostingClassifier(**default_params)
+        self.model.fit(self.x_train, self.y_train)
+        
+        self._post_training('gradient_boosting', default_params)
+        return self
+    
+    def tune_gradient_boosting(self, param_grid=None, method='random', cv=5, scoring='roc_auc', n_iter=50):
+        """
+        Tune Gradient Boosting Decision Tree hyperparameters.
+        
+        :param param_grid: Parameters to search (uses default if None)
+        :param method: 'grid' or 'random'
+        :param cv: Cross-validation folds
+        :param scoring: Metric to optimize
+        :param n_iter: Iterations for random search
+        :return: self (for method chaining)
+        """
+        self._validate_data()
+        
+        if param_grid is None:
+            param_grid = {
+                'n_estimators': [50, 100, 200, 300],
+                'max_depth': [3, 4, 5, 6, 8],
+                'learning_rate': [0.01, 0.05, 0.1, 0.2],
+                'subsample': [0.6, 0.7, 0.8, 0.9, 1.0],
+                'min_samples_split': [2, 5, 10],
+                'min_samples_leaf': [1, 2, 4],
+                'max_features': ['sqrt', 'log2', None]
+            }
+        
+        self._tune_model(
+            base_model=GradientBoostingClassifier(random_state=42),
+            param_grid=param_grid,
+            method=method,
+            cv=cv,
+            scoring=scoring,
+            n_iter=n_iter,
+            model_name='gradient_boosting_tuned'
+        )
+        return self
+    
+    # =========================================================================
     # UPDATE HYPERPARAMETERS
     # =========================================================================
     def update_hyperparameters(self, model_type=None, **new_params):
@@ -355,6 +422,8 @@ class ModelML:
                 model_type = 'rf'
             elif 'xgb' in self.model_name.lower() or 'xgboost' in self.model_name.lower():
                 model_type = 'xgboost'
+            elif 'gradient' in self.model_name.lower() or 'boosting' in self.model_name.lower():
+                model_type = 'gb'
             else:
                 raise ValueError(f"Type de modèle non reconnu: {self.model_name}")
         
@@ -365,8 +434,10 @@ class ModelML:
             return self.train_random_forest(**current_params)
         elif model_type == 'xgboost':
             return self.train_xgboost(**current_params)
+        elif model_type == 'gb':
+            return self.train_gradient_boosting(**current_params)
         else:
-            raise ValueError("model_type doit être 'logistic', 'rf', ou 'xgboost'")
+            raise ValueError("model_type doit être 'logistic', 'rf', 'xgboost', ou 'gb'")
     
     # =========================================================================
     # PREDICTION METHODS
