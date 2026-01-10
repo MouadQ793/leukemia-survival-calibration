@@ -1,0 +1,41 @@
+============================================================
+🔍 ÉVALUATION COMPLÈTE: random_forest_tuned_train
+============================================================
+
+🎯 MÉTRIQUES DE CLASSIFICATION
+----------------------------------------
+   Accuracy                 : 1.0000
+   Balanced_Accuracy        : 1.0000
+   Precision                : 1.0000
+   Recall_Sensitivity       : 1.0000
+   Specificity              : 1.0000
+   F1_Score                 : 1.0000
+   Matthews_Corr_Coef       : 1.0000
+   Cohen_Kappa              : 1.0000
+
+📈 MÉTRIQUES PROBABILISTES
+----------------------------------------
+   ROC_AUC                  : 1.0000
+   PR_AUC                   : 1.0000
+   Brier_Score              : 0.0128
+   Log_Loss                 : 0.0971
+
+🔢 MATRICE DE CONFUSION
+----------------------------------------
+   True Negatives (TN):  46672
+   False Positives (FP): 0
+   False Negatives (FN): 0
+   True Positives (TP):  36883
+
+📋 RAPPORT DE CLASSIFICATION
+----------------------------------------
+              precision    recall  f1-score   support
+
+    Classe 0       1.00      1.00      1.00     46672
+    Classe 1       1.00      1.00      1.00     36883
+
+    accuracy                           1.00     83555
+   macro avg       1.00      1.00      1.00     83555
+weighted avg       1.00      1.00      1.00     83555
+
+============================================================

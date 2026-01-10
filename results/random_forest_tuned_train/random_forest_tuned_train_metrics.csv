@@ -1,0 +1,13 @@
+Métrique,Valeur
+Accuracy,1.0
+Balanced_Accuracy,1.0
+Precision,1.0
+Recall_Sensitivity,1.0
+Specificity,1.0
+F1_Score,1.0
+Matthews_Corr_Coef,1.0
+Cohen_Kappa,1.0
+ROC_AUC,1.0
+PR_AUC,1.0
+Brier_Score,0.012813994374962598
+Log_Loss,0.09707784476812721
