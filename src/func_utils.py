@@ -5,9 +5,13 @@ from scipy.stats import pearsonr, chi2_contingency, pointbiserialr
 from sklearn.metrics import mutual_info_score
 import warnings
 import seaborn as sns
+import itertools
+import random
 warnings.filterwarnings('ignore')
 
-
+"""
+Util functions for data cleaning and feature selection.
+"""
 def clean_features_by_type(df, target_col='OS.YEARS', 
                           mi_threshold_numeric=0.2, 
                           mi_threshold_categorical=0.3,
@@ -337,8 +341,6 @@ def clean_features_by_type(df, target_col='OS.YEARS',
     
     return df_clean, numeric_selected, categorical_selected, results_info
 
-
-# Version simplifiée pour utilisation rapide
 def quick_feature_cleaner(df, target='OS.YEARS'):
     """
     Version simplifiée avec paramètres par défaut raisonnables pour données médicales
@@ -352,8 +354,6 @@ def quick_feature_cleaner(df, target='OS.YEARS'):
         chi2_threshold=0.1,  # p-value maximale pour Chi²
         n_bins=8
     )
-
-
 
 def visualize_cleaning_results(results_info):
     """
@@ -462,9 +462,247 @@ def variable_frequency_table(df):
     return pd.DataFrame(results)
 
 
+"""
+Util functions for training 
+"""
+
+def split_patients_no_leakage(X, Y, train_size=0.6, val_size=0.2, test_size=0.2, random_state=42, id_column='ID'):
+    """
+    Split les données en train/val/test en s'assurant qu'aucun patient n'apparaît dans plusieurs ensembles.
+    Ceci évite le data leakage lors de la génération de paires.
+    
+    : param X: DataFrame des features (doit contenir id_column)
+    :param Y: DataFrame avec colonnes [OS_STATUS, OS_YEARS]
+    :param train_size:  Proportion pour l'entraînement (défaut 0.6)
+    :param val_size: Proportion pour la validation (défaut 0.2)
+    :param test_size: Proportion pour le test (défaut 0.2)
+    :param random_state:  Seed pour reproductibilité
+    :param id_column: Nom de la colonne ID
+    :return: Tuple (X_train, Y_train, X_val, Y_val, X_test, Y_test)
+    """
+    from sklearn.model_selection import train_test_split
+    
+    # Vérifier que les proportions somment à 1
+    assert abs(train_size + val_size + test_size - 1.0) < 1e-6, "Les proportions doivent sommer à 1"
+    
+    n_total = len(X)
+    
+    # Premier split:  train vs (val + test)
+    X_train, X_temp, Y_train, Y_temp = train_test_split(
+        X, Y, 
+        test_size=(val_size + test_size), 
+        random_state=random_state,
+        stratify=Y. iloc[:, 0]  # Stratifier sur OS_STATUS
+    )
+    
+    # Deuxième split: val vs test
+    val_ratio = val_size / (val_size + test_size)
+    X_val, X_test, Y_val, Y_test = train_test_split(
+        X_temp, Y_temp,
+        test_size=(1 - val_ratio),
+        random_state=random_state,
+        stratify=Y_temp.iloc[:, 0]
+    )
+    
+    # Reset index pour éviter les problèmes
+    X_train = X_train.reset_index(drop=True)
+    Y_train = Y_train.reset_index(drop=True)
+    X_val = X_val.reset_index(drop=True)
+    Y_val = Y_val.reset_index(drop=True)
+    X_test = X_test.reset_index(drop=True)
+    Y_test = Y_test.reset_index(drop=True)
+    
+    print(f"Split réalisé sans leakage de patients:")
+    print(f"  Train: {len(X_train)} patients ({len(X_train)/n_total*100:.1f}%)")
+    print(f"  Val:    {len(X_val)} patients ({len(X_val)/n_total*100:.1f}%)")
+    print(f"  Test:  {len(X_test)} patients ({len(X_test)/n_total*100:.1f}%)")
+    
+    # Vérifier qu'il n'y a pas de chevauchement d'IDs
+    train_ids = set(X_train[id_column])
+    val_ids = set(X_val[id_column])
+    test_ids = set(X_test[id_column])
+    
+    assert len(train_ids & val_ids) == 0, "Leakage détecté entre train et val!"
+    assert len(train_ids & test_ids) == 0, "Leakage détecté entre train et test!"
+    assert len(val_ids & test_ids) == 0, "Leakage détecté entre val et test!"
+    print("  ✓ Aucun chevauchement de patients détecté")
+    
+    return X_train, Y_train, X_val, Y_val, X_test, Y_test
+
+def generate_pairs_concat(X, Y, max_pairs=None, include_abs_diff=False, random_state=42, id_column='ID'):
+    """
+    Génère des paires en concaténation, avec option d'ajouter les différences absolues. 
+    Retourne les paires d'IDs (pas les indices de ligne).
+    
+    :param X:  DataFrame des features (doit contenir id_column)
+    :param Y: DataFrame avec colonnes [OS_STATUS, OS_YEARS]
+    :param max_pairs: Nombre maximum de paires à générer
+    :param include_abs_diff: Si True, ajoute les différences absolues comme features
+    :param random_state:  Seed pour reproductibilité
+    :param id_column: Nom de la colonne ID dans X (défaut:  'ID')
+    :return: Tuple (X_pairs_df, y_pairs_array, pair_ids)
+    """
+
+    
+    # Vérifier que id_column existe
+    if id_column not in X.columns:
+        raise ValueError(f"Colonne '{id_column}' non trouvée dans X")
+    
+    # Exclure la colonne ID des features pour la génération de paires
+    X_features = X.drop(columns=[id_column])
+    
+    n = len(X)
+    indices = list(itertools.combinations(range(n), 2))
+    
+    if max_pairs and max_pairs < len(indices):
+        random.seed(random_state)
+        indices = random.sample(indices, max_pairs)
+    
+    X_pairs = []
+    y_pairs = []
+    pair_ids = []
+    
+    for i, j in indices:
+        status_i, time_i = Y.iloc[i, 0], Y.iloc[i, 1]
+        status_j, time_j = Y.iloc[j, 0], Y.iloc[j, 1]
+        
+        # Convert boolean to int if needed
+        status_i = int(status_i)
+        status_j = int(status_j)
+        
+        # Vérifier comparabilité
+        comparable = False
+        label = None
+        
+        if status_i == 1 and status_j == 1:
+            comparable = True
+            label = 1 if time_i < time_j else 0
+        elif status_i == 1 and status_j == 0 and time_i <= time_j: 
+            comparable = True
+            label = 1
+        elif status_i == 0 and status_j == 1 and time_i >= time_j:
+            comparable = True
+            label = 0
+        
+        if comparable: 
+            # Utiliser X_features (sans ID) pour les paires
+            xi, xj = X_features.iloc[i].values, X_features.iloc[j].values
+            
+            # Concaténation de base
+            feat = np. concatenate([xi, xj])
+            
+            # Option: ajouter les différences absolues
+            if include_abs_diff: 
+                abs_diff = np. abs(xi - xj)
+                feat = np.concatenate([feat, abs_diff])
+            
+            X_pairs.append(feat)
+            y_pairs. append(label)
+            
+            # Stocker les IDs réels (pas les indices)
+            id_i = X.iloc[i][id_column]
+            id_j = X.iloc[j][id_column]
+            pair_ids.append((id_i, id_j))
+    
+    if len(X_pairs) == 0:
+        raise ValueError("Aucune paire comparable n'a été trouvée.")
+    
+    # Créer DataFrame avec pair_ids en première colonne
+    X_pairs_array = np.array(X_pairs)
+    n_features = X_pairs_array.shape[1]
+    feature_names = [f'feat_{i}' for i in range(n_features)]
+    
+    result_df = pd.DataFrame(X_pairs_array, columns=feature_names)
+    result_df.insert(0, 'pair_ids', pair_ids)
+    
+    print(f"CONCAT: {len(X_pairs)} paires générées, {n_features} features par paire")
+    
+    return result_df, np. array(y_pairs), pair_ids
 
 
 
+"""
+Others
+"""
+def save_pairs_to_excel(
+    X_pairs_train, y_pairs_train, ids_train,
+    X_pairs_val, y_pairs_val, ids_val,
+    X_pairs_test, y_pairs_test, ids_test,
+    output_path='data/processed_data.xlsx',
+    target_col_name='target',
+    id_col_name='patient_ids',
+    sheet_names=None
+):
+    """
+    Sauvegarde les paires train/val/test dans un fichier Excel avec 3 sheets.
+    
+    : param X_pairs_train: DataFrame des features pour train
+    :param y_pairs_train: Array des labels pour train
+    :param ids_train: Liste des tuples d'IDs pour train
+    :param X_pairs_val: DataFrame des features pour validation
+    :param y_pairs_val: Array des labels pour validation
+    :param ids_val: Liste des tuples d'IDs pour validation
+    :param X_pairs_test: DataFrame des features pour test
+    :param y_pairs_test: Array des labels pour test
+    :param ids_test: Liste des tuples d'IDs pour test
+    :param output_path: Chemin du fichier Excel de sortie
+    :param target_col_name: Nom de la colonne cible (défaut: 'target')
+    :param id_col_name:  Nom de la colonne IDs (défaut: 'patient_ids')
+    :param sheet_names: Dict avec clés 'train', 'val', 'test' pour personnaliser les noms des sheets
+    : return: Dict avec les DataFrames créés
+    """
+
+    # Définir les noms des sheets
+    if sheet_names is None:
+        sheet_names = {'train': 'train', 'val': 'calibration', 'test': 'test'}
+    
+    # Créer le DataFrame pour Train (pair_ids est déjà présent)
+    train_df = X_pairs_train.copy()
+    train_df[target_col_name] = y_pairs_train
+    # Renommer pair_ids en patient_ids si elle existe, sinon l'ajouter
+    if 'pair_ids' in train_df.columns:
+        train_df = train_df.rename(columns={'pair_ids': id_col_name})
+    else:
+        train_df.insert(0, id_col_name, [str(pair) for pair in ids_train])
+    
+    # Créer le DataFrame pour Validation
+    val_df = X_pairs_val.copy()
+    val_df[target_col_name] = y_pairs_val
+    if 'pair_ids' in val_df.columns:
+        val_df = val_df.rename(columns={'pair_ids': id_col_name})
+    else:
+        val_df.insert(0, id_col_name, [str(pair) for pair in ids_val])
+    
+    # Créer le DataFrame pour Test
+    test_df = X_pairs_test.copy()
+    test_df[target_col_name] = y_pairs_test
+    if 'pair_ids' in test_df.columns:
+        test_df = test_df.rename(columns={'pair_ids': id_col_name})
+    else:
+        test_df.insert(0, id_col_name, [str(pair) for pair in ids_test])
+    
+    # Créer le répertoire si nécessaire
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        print(f"✓ Répertoire créé:  {output_dir}")
+    
+    # Sauvegarder dans un fichier Excel avec 3 sheets
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        train_df.to_excel(writer, sheet_name=sheet_names['train'], index=False)
+        val_df.to_excel(writer, sheet_name=sheet_names['val'], index=False)
+        test_df.to_excel(writer, sheet_name=sheet_names['test'], index=False)
+    
+    print(f"✓ Données sauvegardées dans '{output_path}'")
+    print(f"  - Sheet '{sheet_names['train']}': {len(train_df)} paires")
+    print(f"  - Sheet '{sheet_names['val']}': {len(val_df)} paires")
+    print(f"  - Sheet '{sheet_names['test']}': {len(test_df)} paires")
+    
+    return {
+        'train': train_df,
+        'val': val_df,
+        'test':  test_df
+    }
 
 
 

@@ -60,7 +60,7 @@ class DataProcessor:
         else:
             raise ValueError("data_type must be 'molecular' or 'clinical'.")
     
-    def save_data(self, file_path: str = "data/treated_data.csv") -> pd.DataFrame:
+    def save_data(self, file_path: str = "data/treated_data.csv", cols=None) -> pd.DataFrame:
         """
         Saves the treated data to a CSV file in the 'data' directory and returns it.
 
@@ -70,7 +70,11 @@ class DataProcessor:
         if self.temporary is None:
             raise ValueError("No temporary data to save. Process data before saving.")
 
-        self.treated_data = self.temporary
+        if cols is not None:
+            self.treated_data = self.temporary[cols]
+        else:
+            self.treated_data = self.temporary
+
         self.temporary = None
         self.treated_data.to_csv(file_path, index=False)
         warnings.warn("The temporary attribute dataframe has been deleted, refer to treated data.", FutureWarning)
