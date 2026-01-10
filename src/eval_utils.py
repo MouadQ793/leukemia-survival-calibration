@@ -356,16 +356,51 @@ def full_evaluation(y_true, y_pred, y_proba, model_name='model', save_dir='resul
     # 7. Save metrics to CSV
     save_metrics_to_csv(metrics, model_save_dir, model_name)
     
-    # 8. Save metrics to a results text file
+    # 8. Save complete results to a text file
     results_path = os.path.join(model_save_dir, f'{model_name}_results.txt')
-    with open(results_path, 'w') as f:
-        f.write("\n" + "=" * 60 + "\n")
-        f.write(f"🔍 ÉVALUATION COMPLÈTE:  {model_name}\n")
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel()
+    
+    with open(results_path, 'w', encoding='utf-8') as f:
+        f.write("=" * 60 + "\n")
+        f.write(f"🔍 ÉVALUATION COMPLÈTE: {model_name}\n")
         f.write("=" * 60 + "\n\n")
-        for key, value in metrics.items():
-            f.write(f"{key}: {value:.4f}\n")
+        
+        # Classification metrics
+        f.write("🎯 MÉTRIQUES DE CLASSIFICATION\n")
+        f.write("-" * 40 + "\n")
+        classification_metrics = ['Accuracy', 'Balanced_Accuracy', 'Precision', 
+                                  'Recall_Sensitivity', 'Specificity', 'F1_Score',
+                                  'Matthews_Corr_Coef', 'Cohen_Kappa']
+        for name in classification_metrics:
+            if name in metrics:
+                f.write(f"   {name:25s}: {metrics[name]:.4f}\n")
+        
+        # Probabilistic metrics
+        f.write("\n📈 MÉTRIQUES PROBABILISTES\n")
+        f.write("-" * 40 + "\n")
+        probabilistic_metrics = ['ROC_AUC', 'PR_AUC', 'Brier_Score', 'Log_Loss']
+        for name in probabilistic_metrics:
+            if name in metrics:
+                f.write(f"   {name:25s}: {metrics[name]:.4f}\n")
+        
+        # Confusion matrix
+        f.write("\n🔢 MATRICE DE CONFUSION\n")
+        f.write("-" * 40 + "\n")
+        f.write(f"   True Negatives (TN):  {tn}\n")
+        f.write(f"   False Positives (FP): {fp}\n")
+        f.write(f"   False Negatives (FN): {fn}\n")
+        f.write(f"   True Positives (TP):  {tp}\n")
+        
+        # Classification report
+        f.write("\n📋 RAPPORT DE CLASSIFICATION\n")
+        f.write("-" * 40 + "\n")
+        f.write(classification_report(y_true, y_pred, target_names=['Classe 0', 'Classe 1']))
+        
+        f.write("\n" + "=" * 60 + "\n")
+    
     print(f"✓ Résultats sauvegardés dans: {results_path}")
     
-    print(f"\n✅ Évaluation terminée!  Résultats sauvegardés dans:  {model_save_dir}")
+    print(f"\n✅ Évaluation terminée! Résultats sauvegardés dans: {model_save_dir}")
     
     return metrics

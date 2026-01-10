@@ -1,0 +1,17 @@
+
+============================================================
+🔍 ÉVALUATION COMPLÈTE:  xgboost_tuned_test
+============================================================
+
+Accuracy: 0.6930
+Balanced_Accuracy: 0.6866
+Precision: 0.6780
+Recall_Sensitivity: 0.6165
+Specificity: 0.7566
+F1_Score: 0.6458
+Matthews_Corr_Coef: 0.3774
+Cohen_Kappa: 0.3760
+ROC_AUC: 0.7533
+PR_AUC: 0.7126
+Brier_Score: 0.2106
+Log_Loss: 0.6339

@@ -518,3 +518,24 @@ class ModelML:
         if self.x_test is not None:
             print(f"   Taille test: {len(self.x_test)}")
         print("=" * 50)
+
+def find_existing_model(model_dir, model_type):
+    """Cherche un modèle existant du type spécifié."""
+    # Patterns possibles (case-insensitive search)
+    patterns = [
+        os.path.join(model_dir, f"{model_type}*.pkl"),
+        os.path.join(model_dir, f"{model_type.lower()}*.pkl"),
+        os.path.join(model_dir, f"{model_type.replace('Regression', '_regression').lower()}*.pkl"),
+    ]
+    
+    models = []
+    for pattern in patterns:
+        models.extend(glob.glob(pattern))
+    
+    # Exclure les fichiers _params.json
+    models = [m for m in models if '_params' not in m]
+    
+    if models:
+        # Retourner le plus récent
+        return max(models, key=os.path.getctime)
+    return None
