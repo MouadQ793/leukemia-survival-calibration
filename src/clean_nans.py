@@ -98,7 +98,8 @@ test_imputed['target'] = y_test.values
 # SAUVEGARDE
 # =============================================================================
 # Sauvegarder l'imputer
-os.makedirs('imputer', exist_ok=True)
+os.makedirs(os.path.dirname(IMPUTER_PATH), exist_ok=True)
+os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 joblib.dump(imputer, IMPUTER_PATH)
 print(f"\n✓ Imputer sauvegardé:  {IMPUTER_PATH}")
 
