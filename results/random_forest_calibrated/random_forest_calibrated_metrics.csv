@@ -1,0 +1,10 @@
+Métrique,Valeur
+model,random_forest
+brier_before,0.1915302125417179
+brier_after,0.19176304446547648
+log_loss_before,0.5647977581224419
+log_loss_after,0.5652451102609368
+roc_auc_before,0.779008510303926
+roc_auc_after,0.7787542018501021
+brier_improvement,-0.0002328319237585863
+log_loss_improvement,-0.0004473521384948942

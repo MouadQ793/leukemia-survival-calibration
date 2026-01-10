@@ -1,0 +1,10 @@
+Métrique,Valeur
+model,xgboost
+brier_before,0.21055631339550018
+brier_after,0.20134764909744263
+log_loss_before,0.6338903314246271
+log_loss_after,0.5894340901704646
+roc_auc_before,0.7532697932132758
+roc_auc_after,0.7530268864932901
+brier_improvement,0.009208664298057556
+log_loss_improvement,0.04445624125416259

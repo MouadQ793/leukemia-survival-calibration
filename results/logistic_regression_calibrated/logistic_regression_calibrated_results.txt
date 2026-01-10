@@ -1,0 +1,27 @@
+============================================================
+RÉSULTATS CALIBRATION - logistic_regression
+============================================================
+
+Méthode: isotonic (Platt Scaling)
+Données calibration: 28381 échantillons
+Données test: 28465 échantillons
+
+────────────────────────────────────────────────────────────
+COMPARAISON AVANT/APRÈS CALIBRATION
+────────────────────────────────────────────────────────────
+
+Brier Score:
+   Avant:  0.192674
+   Après:  0.192781
+   Amélioration: -0.000106
+
+Log Loss:
+   Avant:  0.567533
+   Après:  0.580383
+   Amélioration: -0.012850
+
+ROC-AUC:
+   Avant:  0.776755
+   Après:  0.776380
+   Changement: -0.000375
+

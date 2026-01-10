@@ -1,0 +1,10 @@
+Métrique,Valeur
+model,logistic_regression
+brier_before,0.19267447595972087
+brier_after,0.19278067693534515
+log_loss_before,0.5675328803448441
+log_loss_after,0.5803830120565361
+roc_auc_before,0.776754942674024
+roc_auc_after,0.7763801890921295
+brier_improvement,-0.00010620097562427655
+log_loss_improvement,-0.012850131711692026

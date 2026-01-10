@@ -1,0 +1,27 @@
+============================================================
+RÉSULTATS CALIBRATION - random_forest
+============================================================
+
+Méthode: isotonic (Platt Scaling)
+Données calibration: 28381 échantillons
+Données test: 28465 échantillons
+
+────────────────────────────────────────────────────────────
+COMPARAISON AVANT/APRÈS CALIBRATION
+────────────────────────────────────────────────────────────
+
+Brier Score:
+   Avant:  0.191530
+   Après:  0.191763
+   Amélioration: -0.000233
+
+Log Loss:
+   Avant:  0.564798
+   Après:  0.565245
+   Amélioration: -0.000447
+
+ROC-AUC:
+   Avant:  0.779009
+   Après:  0.778754
+   Changement: -0.000254
+
