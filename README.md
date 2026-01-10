@@ -62,3 +62,5 @@ The `src/` folder contains all reusable Python modules imported by the notebooks
 | `imputer/`                | Saved imputer object for missing value handling          |
 | `results/`                | Evaluation metrics and results for each model            |
 | `report/`                 | LaTeX report files                                       |
+
+The folders report,model_calibrated/calibrated_isotonic aren't on the online repo because of their size, aswell as the the pickle files of the models.
