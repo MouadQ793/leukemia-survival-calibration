@@ -1,0 +1,12 @@
+{
+    "model_name": "gradient_boosting_tuned",
+    "training_date": "20260110_191416",
+    "hyperparameters": {
+        "subsample": 0.8,
+        "n_estimators": 200,
+        "min_samples_leaf": 2,
+        "max_depth": 8,
+        "learning_rate": 0.1
+    },
+    "cv_best_score": 0.9914639349696628
+}

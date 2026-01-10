@@ -389,7 +389,7 @@ def plot_all_calibration_comparison(results_df, save_path=None):
     ax1.set_title('Comparaison Brier Score', fontsize=12, fontweight='bold')
     ax1.set_xticks(x)
     ax1.set_xticklabels(results_df['model'], rotation=45, ha='right')
-    ax1.legend()
+    ax1.legend(loc='lower right')
     ax1.grid(alpha=0.3, axis='y')
     
     # Log Loss comparison
@@ -401,7 +401,7 @@ def plot_all_calibration_comparison(results_df, save_path=None):
     ax2.set_title('Comparaison Log Loss', fontsize=12, fontweight='bold')
     ax2.set_xticks(x)
     ax2.set_xticklabels(results_df['model'], rotation=45, ha='right')
-    ax2.legend()
+    ax2.legend(loc='lower right')
     ax2.grid(alpha=0.3, axis='y')
     
     plt.tight_layout()
