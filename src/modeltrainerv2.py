@@ -17,7 +17,7 @@ class ModelML():
         self.y_test_pred = None
         self.y_train_pred = None 
         self.model = None
-        self. model_name = None
+        self.model_name = None
         self.training_date = None
         self.best_params = None
         self.cv_results = None
