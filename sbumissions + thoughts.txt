@@ -1,0 +1,4 @@
+first submission : with standard logistic regression.
+Second submisson : with not calibrated 
+
+to do : add imputer for genetic data, because right now it's full of 0 for molecular data
