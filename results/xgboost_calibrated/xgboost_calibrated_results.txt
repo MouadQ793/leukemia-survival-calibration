@@ -2,26 +2,26 @@
 RÉSULTATS CALIBRATION - xgboost
 ============================================================
 
-Méthode: isotonic (Platt Scaling)
-Données calibration: 28381 échantillons
-Données test: 28465 échantillons
+Méthode: sigmoid (Platt Scaling)
+Données calibration: 56725 échantillons
+Données test: 56938 échantillons
 
 ────────────────────────────────────────────────────────────
 COMPARAISON AVANT/APRÈS CALIBRATION
 ────────────────────────────────────────────────────────────
 
 Brier Score:
-   Avant:  0.210556
-   Après:  0.201348
-   Amélioration: 0.009209
+   Avant:  0.213900
+   Après:  0.203806
+   Amélioration: 0.010094
 
 Log Loss:
-   Avant:  0.633890
-   Après:  0.589434
-   Amélioration: 0.044456
+   Avant:  0.643905
+   Après:  0.594551
+   Amélioration: 0.049354
 
 ROC-AUC:
-   Avant:  0.753270
-   Après:  0.753027
-   Changement: -0.000243
+   Avant:  0.750309
+   Après:  0.750309
+   Changement: +0.000000
 
