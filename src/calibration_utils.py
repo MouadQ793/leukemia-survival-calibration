@@ -1,14 +1,13 @@
 # =============================================================================
-# CALIBRATION UTILITIES - Platt Scaling
+# CALIBRATION UTILITIES - Platt scaling and isotonic regression
 # =============================================================================
 import os
 import glob
 import joblib
-import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.calibration import CalibratedClassifierCV, calibration_curve
+from sklearn.calibration import calibration_curve
 from sklearn.metrics import brier_score_loss, log_loss, roc_auc_score
 
 
@@ -37,8 +36,8 @@ def find_all_models(model_dir='models', pattern='*_tuned.pkl'):
     """
     Find all tuned models in a directory.
     
-    : param model_dir: Directory containing models
-    :param pattern:  Glob pattern to match model files
+    :param model_dir: Directory containing models
+    :param pattern: Glob pattern to match model files
     :return: List of model paths
     """
     search_pattern = os.path.join(model_dir, pattern)
@@ -47,7 +46,7 @@ def find_all_models(model_dir='models', pattern='*_tuned.pkl'):
     # Exclude params files
     models = [m for m in models if '_params' not in m]
     
-    print(f"📂 Modèles trouvés dans '{model_dir}':")
+    print(f"Models found in '{model_dir}':")
     for m in models:
         print(f"   - {os.path.basename(m)}")
     
@@ -60,13 +59,13 @@ def calibrate_model(model, X_cal, y_cal, method='sigmoid'):
     
     For pre-trained models, we fit the calibration method on X_cal without retraining the base model.
     
-    :param model:  Trained sklearn model (already fitted)
+    :param model: Trained sklearn model (already fitted)
     :param X_cal: Calibration features
-    :param y_cal:  Calibration labels
+    :param y_cal: Calibration labels
     :param method: 'sigmoid' (Platt) or 'isotonic'
     :return: Calibrated model
     """
-    print(f"   🔄 Calibration avec méthode: {method}")
+    print(f"   Calibrating with method: {method}")
     
     from sklearn.calibration import _SigmoidCalibration
     from sklearn.isotonic import IsotonicRegression
@@ -95,18 +94,18 @@ def evaluate_calibration(y_true, y_proba_uncalibrated, y_proba_calibrated, model
     Compare calibration metrics before and after calibration.
     
     :param y_true: True labels
-    :param y_proba_uncalibrated:  Probabilities before calibration
+    :param y_proba_uncalibrated: Probabilities before calibration
     :param y_proba_calibrated: Probabilities after calibration
     :param model_name: Name of the model
     :return: Dict with metrics
     """
     metrics = {
-        'model':  model_name,
+        'model': model_name,
         'brier_before': brier_score_loss(y_true, y_proba_uncalibrated),
         'brier_after': brier_score_loss(y_true, y_proba_calibrated),
         'log_loss_before': log_loss(y_true, y_proba_uncalibrated),
         'log_loss_after': log_loss(y_true, y_proba_calibrated),
-        'roc_auc_before':  roc_auc_score(y_true, y_proba_uncalibrated),
+        'roc_auc_before': roc_auc_score(y_true, y_proba_uncalibrated),
         'roc_auc_after': roc_auc_score(y_true, y_proba_calibrated)
     }
     
@@ -136,14 +135,14 @@ def plot_calibration_curve(y_true, y_proba_uncalibrated, y_proba_calibrated,
     ax1 = axes[0]
     
     # Perfect calibration line
-    ax1.plot([0, 1], [0, 1], 'k--', label='Parfaitement calibré')
+    ax1.plot([0, 1], [0, 1], 'k--', label='Perfectly calibrated')
     
     # Before calibration
     prob_true_before, prob_pred_before = calibration_curve(
         y_true, y_proba_uncalibrated, n_bins=n_bins, strategy='uniform'
     )
     ax1.plot(prob_pred_before, prob_true_before, 's-', 
-             label=f'Avant calibration (Brier={brier_score_loss(y_true, y_proba_uncalibrated):.4f})',
+             label=f'Before calibration (Brier={brier_score_loss(y_true, y_proba_uncalibrated):.4f})',
              color='red', markersize=8)
     
     # After calibration
@@ -151,22 +150,22 @@ def plot_calibration_curve(y_true, y_proba_uncalibrated, y_proba_calibrated,
         y_true, y_proba_calibrated, n_bins=n_bins, strategy='uniform'
     )
     ax1.plot(prob_pred_after, prob_true_after, 'o-', 
-             label=f'Après calibration (Brier={brier_score_loss(y_true, y_proba_calibrated):.4f})',
+             label=f'After calibration (Brier={brier_score_loss(y_true, y_proba_calibrated):.4f})',
              color='green', markersize=8)
     
-    ax1.set_xlabel('Probabilité prédite moyenne')
-    ax1.set_ylabel('Fraction de positifs')
-    ax1.set_title(f'{model_name} - Courbe de Calibration', fontsize=12, fontweight='bold')
+    ax1.set_xlabel('Mean predicted probability')
+    ax1.set_ylabel('Fraction of positives')
+    ax1.set_title(f'{model_name} - Calibration curve', fontsize=12, fontweight='bold')
     ax1.legend(loc='lower right')
     ax1.grid(alpha=0.3)
     
     # Histogram of predicted probabilities
     ax2 = axes[1]
-    ax2.hist(y_proba_uncalibrated, bins=20, alpha=0.5, label='Avant calibration', color='red', edgecolor='black')
-    ax2.hist(y_proba_calibrated, bins=20, alpha=0.5, label='Après calibration', color='green', edgecolor='black')
-    ax2.set_xlabel('Probabilité prédite')
-    ax2.set_ylabel('Fréquence')
-    ax2.set_title(f'{model_name} - Distribution des Probabilités', fontsize=12, fontweight='bold')
+    ax2.hist(y_proba_uncalibrated, bins=20, alpha=0.5, label='Before calibration', color='red', edgecolor='black')
+    ax2.hist(y_proba_calibrated, bins=20, alpha=0.5, label='After calibration', color='green', edgecolor='black')
+    ax2.set_xlabel('Predicted probability')
+    ax2.set_ylabel('Frequency')
+    ax2.set_title(f'{model_name} - Probability distribution', fontsize=12, fontweight='bold')
     ax2.legend()
     ax2.grid(alpha=0.3)
     
@@ -174,7 +173,7 @@ def plot_calibration_curve(y_true, y_proba_uncalibrated, y_proba_calibrated,
     
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"   ✓ Plot sauvegardé:  {save_path}")
+        print(f"   ✓ Plot saved: {save_path}")
     
     return fig
 
@@ -196,13 +195,13 @@ def save_calibrated_model(calibrated_model, original_model_path, output_dir='mod
     save_path = os.path.join(output_dir, calibrated_name)
     
     joblib.dump(calibrated_model, save_path)
-    print(f"   ✓ Modèle calibré sauvegardé: {save_path}")
+    print(f"   ✓ Calibrated model saved: {save_path}")
     
     return save_path
 
 
 def calibrate_all_models(
-    model_dir='model',
+    model_dir='models',
     output_dir='model_calibrated',
     X_cal=None,
     y_cal=None,
@@ -219,7 +218,7 @@ def calibrate_all_models(
     
     :param model_dir: Directory containing trained models
     :param output_dir: Directory to save calibrated models
-    :param X_cal:  Calibration features
+    :param X_cal: Calibration features
     :param y_cal: Calibration labels
     :param X_test: Test features for evaluation
     :param y_test: Test labels for evaluation
@@ -231,16 +230,16 @@ def calibrate_all_models(
     :return: DataFrame with calibration results
     """
     if X_cal is None or y_cal is None:
-        raise ValueError("X_cal et y_cal sont requis pour la calibration")
+        raise ValueError("X_cal and y_cal are required for calibration")
     
     if X_test is None or y_test is None:
-        raise ValueError("X_test et y_test sont requis pour l'évaluation")
+        raise ValueError("X_test and y_test are required for evaluation")
     
     # Find all models
     model_paths = find_all_models(model_dir, pattern)
     
     if len(model_paths) == 0:
-        print(f"⚠️ Aucun modèle trouvé avec le pattern '{pattern}' dans '{model_dir}'")
+        print(f"Warning: no models found matching pattern '{pattern}' in '{model_dir}'")
         return None
     
     
@@ -248,22 +247,22 @@ def calibrate_all_models(
     all_results = []
     
     print(f"\n{'='*60}")
-    print(f"🔄 CALIBRATION DE {len(model_paths)} MODÈLES")
+    print(f"CALIBRATING {len(model_paths)} MODELS")
     print(f"{'='*60}")
-    print(f"   Méthode: {method} (Platt Scaling)" if method == 'sigmoid' else f"   Méthode: {method}")
-    print(f"   Données calibration: {len(X_cal)} échantillons")
-    print(f"   Données test: {len(X_test)} échantillons")
+    print(f"   Method: {method} (Platt scaling)" if method == 'sigmoid' else f"   Method: {method}")
+    print(f"   Calibration data: {len(X_cal)} samples")
+    print(f"   Test data: {len(X_test)} samples")
     
     for model_path in model_paths: 
         model_name = os.path.basename(model_path).replace('.pkl', '').replace('_tuned', '')
         
         print(f"\n{'─'*50}")
-        print(f"📦 Modèle: {model_name}")
+        print(f"Model: {model_name}")
         print(f"{'─'*50}")
         
         # Load model
         model = joblib.load(model_path)
-        print(f"   ✓ Modèle chargé: {model_path}")
+        print(f"   ✓ Model loaded: {model_path}")
         
         # Get uncalibrated probabilities on test set
         y_proba_uncalibrated = model.predict_proba(X_test)[:, 1]
@@ -284,7 +283,7 @@ def calibrate_all_models(
         all_results.append(metrics)
         
         # Print metrics
-        print(f"\n   📊 Métriques sur Test Set:")
+        print(f"\n   Test set metrics:")
         print(f"      Brier Score:   {metrics['brier_before']:.4f} → {metrics['brier_after']:.4f} "
               f"({'↓' if metrics['brier_improvement'] > 0 else '↑'} {abs(metrics['brier_improvement']):.4f})")
         print(f"      Log Loss:      {metrics['log_loss_before']:.4f} → {metrics['log_loss_after']:.4f} "
@@ -309,43 +308,43 @@ def calibrate_all_models(
         
         # Save calibration metrics to CSV
         metrics_df = pd.DataFrame({
-            'Métrique': list(metrics.keys()),
-            'Valeur': list(metrics.values())
+            'Metric': list(metrics.keys()),
+            'Value': list(metrics.values())
         })
         metrics_csv_path = os.path.join(model_results_dir, f'{model_name}_calibrated_metrics.csv')
         metrics_df.to_csv(metrics_csv_path, index=False)
-        print(f"   ✓ Métriques sauvegardées: {metrics_csv_path}")
+        print(f"   ✓ Metrics saved: {metrics_csv_path}")
         
         # Save calibration results to TXT
         results_txt_path = os.path.join(model_results_dir, f'{model_name}_calibrated_results.txt')
         with open(results_txt_path, 'w', encoding='utf-8') as f:
             f.write(f"{'='*60}\n")
-            f.write(f"RÉSULTATS CALIBRATION - {model_name}\n")
+            f.write(f"CALIBRATION RESULTS - {model_name}\n")
             f.write(f"{'='*60}\n\n")
-            f.write(f"Méthode: {method} (Platt Scaling)\n")
-            f.write(f"Données calibration: {len(X_cal)} échantillons\n")
-            f.write(f"Données test: {len(X_test)} échantillons\n\n")
+            f.write(f"Method: {method} (Platt scaling)\n" if method == 'sigmoid' else f"Method: {method} (isotonic regression)\n")
+            f.write(f"Calibration data: {len(X_cal)} samples\n")
+            f.write(f"Test data: {len(X_test)} samples\n\n")
             
             f.write(f"{'─'*60}\n")
-            f.write("COMPARAISON AVANT/APRÈS CALIBRATION\n")
+            f.write("BEFORE/AFTER CALIBRATION COMPARISON\n")
             f.write(f"{'─'*60}\n\n")
             
             f.write(f"Brier Score:\n")
-            f.write(f"   Avant:  {metrics['brier_before']:.6f}\n")
-            f.write(f"   Après:  {metrics['brier_after']:.6f}\n")
-            f.write(f"   Amélioration: {metrics['brier_improvement']:.6f}\n\n")
+            f.write(f"   Before: {metrics['brier_before']:.6f}\n")
+            f.write(f"   After:  {metrics['brier_after']:.6f}\n")
+            f.write(f"   Improvement: {metrics['brier_improvement']:.6f}\n\n")
             
             f.write(f"Log Loss:\n")
-            f.write(f"   Avant:  {metrics['log_loss_before']:.6f}\n")
-            f.write(f"   Après:  {metrics['log_loss_after']:.6f}\n")
-            f.write(f"   Amélioration: {metrics['log_loss_improvement']:.6f}\n\n")
+            f.write(f"   Before: {metrics['log_loss_before']:.6f}\n")
+            f.write(f"   After:  {metrics['log_loss_after']:.6f}\n")
+            f.write(f"   Improvement: {metrics['log_loss_improvement']:.6f}\n\n")
             
             f.write(f"ROC-AUC:\n")
-            f.write(f"   Avant:  {metrics['roc_auc_before']:.6f}\n")
-            f.write(f"   Après:  {metrics['roc_auc_after']:.6f}\n")
-            f.write(f"   Changement: {metrics['roc_auc_after'] - metrics['roc_auc_before']:+.6f}\n\n")
+            f.write(f"   Before: {metrics['roc_auc_before']:.6f}\n")
+            f.write(f"   After:  {metrics['roc_auc_after']:.6f}\n")
+            f.write(f"   Change: {metrics['roc_auc_after'] - metrics['roc_auc_before']:+.6f}\n\n")
         
-        print(f"   ✓ Résultats sauvegardés: {results_txt_path}")
+        print(f"   ✓ Results saved: {results_txt_path}")
         
         # Save calibrated model
         save_calibrated_model(calibrated_model, model_path, output_dir)
@@ -356,11 +355,11 @@ def calibrate_all_models(
     # Save overall results to CSV
     results_path = os.path.join(output_dir, 'calibration_results.csv')
     results_df.to_csv(results_path, index=False)
-    print(f"\n✓ Résultats globaux sauvegardés: {results_path}")
+    print(f"\n✓ Overall results saved: {results_path}")
     
     # Print summary
     print(f"\n{'='*60}")
-    print("📋 RÉSUMÉ DE LA CALIBRATION")
+    print("CALIBRATION SUMMARY")
     print(f"{'='*60}")
     print(results_df[['model', 'brier_before', 'brier_after', 'brier_improvement']].to_string(index=False))
     
@@ -371,7 +370,7 @@ def plot_all_calibration_comparison(results_df, save_path=None):
     """
     Plot comparison of calibration improvement across all models.
     
-    : param results_df: DataFrame from calibrate_all_models
+    :param results_df: DataFrame from calibrate_all_models
     :param save_path: Path to save the plot
     :return: Figure object
     """
@@ -382,11 +381,11 @@ def plot_all_calibration_comparison(results_df, save_path=None):
     
     # Brier Score comparison
     ax1 = axes[0]
-    bars1 = ax1.bar(x - width/2, results_df['brier_before'], width, label='Avant', color='red', alpha=0.7)
-    bars2 = ax1.bar(x + width/2, results_df['brier_after'], width, label='Après', color='green', alpha=0.7)
-    ax1.set_xlabel('Modèle')
-    ax1.set_ylabel('Brier Score (↓ meilleur)')
-    ax1.set_title('Comparaison Brier Score', fontsize=12, fontweight='bold')
+    bars1 = ax1.bar(x - width/2, results_df['brier_before'], width, label='Before', color='red', alpha=0.7)
+    bars2 = ax1.bar(x + width/2, results_df['brier_after'], width, label='After', color='green', alpha=0.7)
+    ax1.set_xlabel('Model')
+    ax1.set_ylabel('Brier Score (lower is better)')
+    ax1.set_title('Brier Score comparison', fontsize=12, fontweight='bold')
     ax1.set_xticks(x)
     ax1.set_xticklabels(results_df['model'], rotation=45, ha='right')
     ax1.legend(loc='lower right')
@@ -394,11 +393,11 @@ def plot_all_calibration_comparison(results_df, save_path=None):
     
     # Log Loss comparison
     ax2 = axes[1]
-    bars3 = ax2.bar(x - width/2, results_df['log_loss_before'], width, label='Avant', color='red', alpha=0.7)
-    bars4 = ax2.bar(x + width/2, results_df['log_loss_after'], width, label='Après', color='green', alpha=0.7)
-    ax2.set_xlabel('Modèle')
-    ax2.set_ylabel('Log Loss (↓ meilleur)')
-    ax2.set_title('Comparaison Log Loss', fontsize=12, fontweight='bold')
+    bars3 = ax2.bar(x - width/2, results_df['log_loss_before'], width, label='Before', color='red', alpha=0.7)
+    bars4 = ax2.bar(x + width/2, results_df['log_loss_after'], width, label='After', color='green', alpha=0.7)
+    ax2.set_xlabel('Model')
+    ax2.set_ylabel('Log Loss (lower is better)')
+    ax2.set_title('Log Loss comparison', fontsize=12, fontweight='bold')
     ax2.set_xticks(x)
     ax2.set_xticklabels(results_df['model'], rotation=45, ha='right')
     ax2.legend(loc='lower right')
@@ -408,6 +407,6 @@ def plot_all_calibration_comparison(results_df, save_path=None):
     
     if save_path:
         plt.savefig(save_path, dpi=150, bbox_inches='tight')
-        print(f"✓ Comparaison sauvegardée:  {save_path}")
+        print(f"✓ Comparison saved: {save_path}")
     
     return fig

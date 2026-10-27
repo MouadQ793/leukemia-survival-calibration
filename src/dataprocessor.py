@@ -1,13 +1,6 @@
-import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler
-from typing import Optional, Dict, Any
+from typing import Dict
 import warnings
-import itertools
-import seaborn as sns
-import random
 import re
 
 # =============================================================
@@ -17,16 +10,16 @@ import re
 class DataProcessor:
   
     def __init__(self, molecular_data: pd.DataFrame, clinical_data: pd.DataFrame, target_data: pd.DataFrame) -> None:
-            """
-            Initialize the DataProcessor with molecular, clinical, and target data.
-            """
-            self.molecular_data : pd.DataFrame = molecular_data
-            self.clinical_data : pd.DataFrame = clinical_data
-            self.target_data : pd.DataFrame = target_data
-            self.merged_table : pd.DataFrame = None
-            self.treated_data : pd.DataFrame = None
-            self.temporary : pd.DataFrame = None
-            self.temporary_annotation : str = None
+        """
+        Initialize the DataProcessor with molecular, clinical, and target data.
+        """
+        self.molecular_data : pd.DataFrame = molecular_data
+        self.clinical_data : pd.DataFrame = clinical_data
+        self.target_data : pd.DataFrame = target_data
+        self.merged_table : pd.DataFrame = None
+        self.treated_data : pd.DataFrame = None
+        self.temporary : pd.DataFrame = None
+        self.temporary_annotation : str = None
     
     """
     Data handling methods
@@ -101,10 +94,10 @@ class DataProcessor:
             print(self.merged_table.head())
 
     def get_data_shapes(self) -> tuple:
-            """
-            Returns the shapes of the molecular, clinical, and target datasets.
-            """
-            return (f"the molecular data shape: {self.molecular_data.shape}, clinical data shape: {self.clinical_data.shape}, target data shape: {self.target_data.shape}")
+        """
+        Returns the shapes of the molecular, clinical, and target datasets.
+        """
+        return (f"the molecular data shape: {self.molecular_data.shape}, clinical data shape: {self.clinical_data.shape}, target data shape: {self.target_data.shape}")
     
     def get_summary_statistics(self) -> Dict[str, pd.DataFrame]:
         """
@@ -159,7 +152,7 @@ class DataProcessor:
     def aggregate_genes(self):
 
         """
-        Groups genes  by summing danger and creating dummies for categorical variables.
+        Groups genes by summing danger and creating dummies for categorical variables.
         """
         self.merge_tables()
         
@@ -167,7 +160,7 @@ class DataProcessor:
         gene_train_dummies = pd.get_dummies(merged_data, columns=['GENE','CHR','EFFECT'])
 
         gene_train_F = gene_train_dummies.groupby(['ID']).agg({
-        'DANGER': 'sum',  # Sum DEPTH values
+        'DANGER': 'sum',  # Sum DANGER values
         **{col: 'max' for col in gene_train_dummies.columns if col not in ['ID', 'OS_YEARS', 'OS_STATUS', 'DANGER']}
         }).reset_index()
         self.temporary_annotation = "Aggregation gene"
@@ -175,20 +168,21 @@ class DataProcessor:
                                                                 ).merge(self.target_data,on="ID",how="left")
  
 
-    def classify_cytogenetics(self, text: str) -> str:
+    @staticmethod
+    def classify_cytogenetics(text: str) -> str:
         """
-        Classifies cytogenetics labels into categories: normal, defavorable, or intermediaire.
+        Classifies cytogenetics labels into categories: normal, adverse, or intermediate.
 
         :param text: The cytogenetics text to classify.
         :return: The classification category.
         """
         t = str(text).lower().replace(" ", "")
 
-        # ---------- 1) CARYOTYPE NORMAL ----------
+        # ---------- 1) NORMAL KARYOTYPE ----------
         if ("46,xx" in t or "46,xy" in t) and not re.search(r"[\+\-]|del|t\(|inv\(", t):
             return "normal"
 
-        # ---------- 2) DÉFAVORABLE (ELN 2022) ----------
+        # ---------- 2) ADVERSE (ELN 2022) ----------
         unfavorable_patterns = [
             r"-5", r"del\(5", r"5q",     # chromosome 5
             r"-7", r"del\(7", r"7q",     # chromosome 7
@@ -200,22 +194,22 @@ class DataProcessor:
             r"i\(17q", r"del\(17p",      # chromosome 17 anomalies
         ]
         if any(re.search(p, t) for p in unfavorable_patterns):
-            return "defavorable"
+            return "adverse"
 
-        # Caryotype complexe (>= 3 anomalies)
+        # Complex karyotype (>= 3 abnormalities)
         if len(re.findall(r"[\+\-]", t)) >= 3:
-            return "defavorable"
+            return "adverse"
 
-        # ---------- 3) INTERMÉDIAIRE ----------
+        # ---------- 3) INTERMEDIATE ----------
         intermediate_patterns = [
             r"t\(9;11",      # KMT2A::MLLT3
             r"\+8", r"trisomy8",
         ]
         if any(re.search(p, t) for p in intermediate_patterns):
-            return "intermediaire"
+            return "intermediate"
 
-        # Par défaut (non normal, non défavorable)
-        return "intermediaire"
+        # Default (neither normal nor adverse)
+        return "intermediate"
 
     def apply_cytogenetics_classification(self, column_name: str = "CYTOGENETICS") -> pd.DataFrame:
         """

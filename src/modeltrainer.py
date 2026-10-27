@@ -1,5 +1,5 @@
 # =============================================================================
-# MODEL TRAINER - Complete Version
+# MODEL TRAINER - training, tuning, saving and loading classifiers
 # =============================================================================
 import os
 import joblib
@@ -16,7 +16,7 @@ try:
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
-    print("⚠️ XGBoost non installé.  Installez avec:  pip install xgboost")
+    print("Warning: XGBoost is not installed. Install with: pip install xgboost")
 
 
 class ModelML: 
@@ -27,7 +27,7 @@ class ModelML:
         self.y_train = y_train
         self.x_test = x_test
         self.y_test = y_test
-        self. y_test_pred = None
+        self.y_test_pred = None
         self.y_train_pred = None
         self.y_test_proba = None
         self.y_train_proba = None
@@ -43,12 +43,12 @@ class ModelML:
     def _validate_data(self):
         """Check that training data is available."""
         if self.x_train is None or self.y_train is None:
-            raise ValueError("Les données d'entraînement ne sont pas définies.")
+            raise ValueError("Training data is not defined.")
     
     def _post_training(self, model_name, params):
         """Common operations after training."""
         self.model_name = model_name
-        self.training_date = datetime. now().strftime("%Y%m%d_%H%M%S")
+        self.training_date = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.best_params = params
         
         # Predictions on train
@@ -58,7 +58,7 @@ class ModelML:
         
         # Predictions on test
         if self.x_test is not None:
-            self.y_test_pred = self.model. predict(self.x_test)
+            self.y_test_pred = self.model.predict(self.x_test)
             if hasattr(self.model, 'predict_proba'):
                 self.y_test_proba = self.model.predict_proba(self.x_test)[:, 1]
         
@@ -67,21 +67,21 @@ class ModelML:
     def _print_metrics(self):
         """Print quick accuracy metrics."""
         train_acc = np.mean(self.y_train_pred == self.y_train)
-        print(f"\n📊 Résultats:")
+        print(f"\nResults:")
         print(f"   - Train Accuracy: {train_acc:.4f}")
         if self.y_test is not None and self.y_test_pred is not None:
-            test_acc = np.mean(self. y_test_pred == self. y_test)
+            test_acc = np.mean(self.y_test_pred == self.y_test)
             print(f"   - Test Accuracy:  {test_acc:.4f}")
     
     def _tune_model(self, base_model, param_grid, method, cv, scoring, n_iter, model_name):
         """Generic method for hyperparameter tuning."""
         
         method_upper = method.upper()
-        print(f"\n🔍 Recherche d'hyperparamètres ({method_upper})")
-        print(f"   Modèle: {model_name}")
+        print(f"\nHyperparameter search ({method_upper})")
+        print(f"   Model: {model_name}")
         print(f"   Scoring: {scoring}")
-        print(f"   CV folds:  {cv}")
-        print(f"   Paramètres testés: {list(param_grid. keys())}")
+        print(f"   CV folds: {cv}")
+        print(f"   Parameters searched: {list(param_grid.keys())}")
         
         if method_upper == 'GRID':
             search = GridSearchCV(
@@ -104,21 +104,21 @@ class ModelML:
                 random_state=42
             )
         else:
-            raise ValueError("method doit être 'grid' ou 'random'")
+            raise ValueError("method must be 'grid' or 'random'")
         
-        search.fit(self.x_train, self. y_train)
+        search.fit(self.x_train, self.y_train)
         
         self.model = search.best_estimator_
         self.best_params = search.best_params_
         self.cv_results = {
-            'best_score':  search.best_score_,
-            'best_params': search. best_params_,
+            'best_score': search.best_score_,
+            'best_params': search.best_params_,
             'cv_results': search.cv_results_
         }
         
-        print(f"\n✓ Meilleurs paramètres trouvés:")
+        print(f"\nBest parameters found:")
         for param, value in self.best_params.items():
-            print(f"   - {param}:  {value}")
+            print(f"   - {param}: {value}")
         print(f"   - Best CV Score ({scoring}): {search.best_score_:.4f}")
         
         self._post_training(model_name, self.best_params)
@@ -131,7 +131,7 @@ class ModelML:
         Train a Logistic Regression model. 
         
         :param lr_params: Parameters for LogisticRegression
-        : return: self (for method chaining)
+        :return: self (for method chaining)
         """
         self._validate_data()
         
@@ -141,11 +141,11 @@ class ModelML:
         }
         default_params.update(lr_params)
         
-        print(f"\n🔄 Entraînement Logistic Regression")
-        print(f"   Paramètres: {default_params}")
+        print(f"\nTraining Logistic Regression")
+        print(f"   Parameters: {default_params}")
         
         self.model = LogisticRegression(**default_params)
-        self.model.fit(self.x_train, self. y_train)
+        self.model.fit(self.x_train, self.y_train)
         
         self._post_training('logistic_regression', default_params)
         return self
@@ -158,7 +158,7 @@ class ModelML:
         :param method: 'grid' or 'random'
         :param cv: Cross-validation folds
         :param scoring: Metric to optimize ('accuracy', 'roc_auc', 'f1', etc.)
-        :param n_iter:  Iterations for random search
+        :param n_iter: Iterations for random search
         :return: self (for method chaining)
         """
         self._validate_data()
@@ -190,7 +190,7 @@ class ModelML:
         """
         Train a Random Forest model.
         
-        : param rf_params: Parameters for RandomForestClassifier
+        :param rf_params: Parameters for RandomForestClassifier
         :return: self (for method chaining)
         """
         self._validate_data()
@@ -200,15 +200,15 @@ class ModelML:
             'max_depth': None,
             'min_samples_split': 2,
             'min_samples_leaf': 1,
-            'random_state':  42,
+            'random_state': 42,
             'n_jobs': -1
         }
         default_params.update(rf_params)
         
-        print(f"\n🔄 Entraînement Random Forest")
-        print(f"   Paramètres: {default_params}")
+        print(f"\nTraining Random Forest")
+        print(f"   Parameters: {default_params}")
         
-        self. model = RandomForestClassifier(**default_params)
+        self.model = RandomForestClassifier(**default_params)
         self.model.fit(self.x_train, self.y_train)
         
         self._post_training('random_forest', default_params)
@@ -222,7 +222,7 @@ class ModelML:
         :param method: 'grid' or 'random'
         :param cv: Cross-validation folds
         :param scoring: Metric to optimize
-        :param n_iter:  Iterations for random search
+        :param n_iter: Iterations for random search
         :return: self (for method chaining)
         """
         self._validate_data()
@@ -259,7 +259,7 @@ class ModelML:
         :return: self (for method chaining)
         """
         if not XGBOOST_AVAILABLE:
-            raise ImportError("XGBoost non installé.  Installez avec: pip install xgboost")
+            raise ImportError("XGBoost is not installed. Install with: pip install xgboost")
         
         self._validate_data()
         
@@ -275,11 +275,11 @@ class ModelML:
         }
         default_params.update(xgb_params)
         
-        print(f"\n🔄 Entraînement XGBoost")
-        print(f"   Paramètres: {default_params}")
+        print(f"\nTraining XGBoost")
+        print(f"   Parameters: {default_params}")
         
-        self. model = xgb.XGBClassifier(**default_params)
-        self.model.fit(self.x_train, self. y_train)
+        self.model = xgb.XGBClassifier(**default_params)
+        self.model.fit(self.x_train, self.y_train)
         
         self._post_training('xgboost', default_params)
         return self
@@ -291,12 +291,12 @@ class ModelML:
         :param param_grid: Parameters to search (uses default if None)
         :param method: 'grid' or 'random'
         :param cv: Cross-validation folds
-        :param scoring:  Metric to optimize
+        :param scoring: Metric to optimize
         :param n_iter: Iterations for random search
         :return: self (for method chaining)
         """
         if not XGBOOST_AVAILABLE:
-            raise ImportError("XGBoost non installé.  Installez avec: pip install xgboost")
+            raise ImportError("XGBoost is not installed. Install with: pip install xgboost")
         
         self._validate_data()
         
@@ -345,8 +345,8 @@ class ModelML:
         }
         default_params.update(gb_params)
         
-        print(f"\n🔄 Entraînement Gradient Boosting DT")
-        print(f"   Paramètres: {default_params}")
+        print(f"\nTraining Gradient Boosting DT")
+        print(f"   Parameters: {default_params}")
         
         self.model = GradientBoostingClassifier(**default_params)
         self.model.fit(self.x_train, self.y_train)
@@ -403,19 +403,19 @@ class ModelML:
         if self.best_params is None:
             current_params = {}
         else:
-            current_params = self.best_params. copy()
+            current_params = self.best_params.copy()
         
         # Update with new params
         current_params.update(new_params)
         
-        print(f"\n🔄 Mise à jour des hyperparamètres et ré-entraînement")
-        print(f"   Anciens:  {self.best_params}")
-        print(f"   Nouveaux:  {current_params}")
+        print(f"\nUpdating hyperparameters and retraining")
+        print(f"   Old: {self.best_params}")
+        print(f"   New: {current_params}")
         
         # Auto-detect model type if not provided
         if model_type is None:
             if self.model_name is None:
-                raise ValueError("Aucun modèle précédent.  Spécifiez model_type='logistic', 'rf', ou 'xgboost'")
+                raise ValueError("No previous model. Specify model_type='logistic', 'rf', or 'xgboost'")
             elif 'logistic' in self.model_name.lower():
                 model_type = 'logistic'
             elif 'random' in self.model_name.lower() or 'forest' in self.model_name.lower():
@@ -425,7 +425,7 @@ class ModelML:
             elif 'gradient' in self.model_name.lower() or 'boosting' in self.model_name.lower():
                 model_type = 'gb'
             else:
-                raise ValueError(f"Type de modèle non reconnu: {self.model_name}")
+                raise ValueError(f"Unrecognized model type: {self.model_name}")
         
         # Retrain with updated params
         if model_type == 'logistic':
@@ -437,7 +437,7 @@ class ModelML:
         elif model_type == 'gb':
             return self.train_gradient_boosting(**current_params)
         else:
-            raise ValueError("model_type doit être 'logistic', 'rf', 'xgboost', ou 'gb'")
+            raise ValueError("model_type must be 'logistic', 'rf', 'xgboost', or 'gb'")
     
     # =========================================================================
     # PREDICTION METHODS
@@ -445,16 +445,16 @@ class ModelML:
     def predict(self, X):
         """Make predictions."""
         if self.model is None:
-            raise ValueError("Aucun modèle entraîné.")
+            raise ValueError("No trained model.")
         return self.model.predict(X)
     
     def predict_proba(self, X):
         """Get prediction probabilities."""
         if self.model is None:
-            raise ValueError("Aucun modèle entraîné.")
+            raise ValueError("No trained model.")
         if hasattr(self.model, 'predict_proba'):
             return self.model.predict_proba(X)
-        raise AttributeError("Ce modèle ne supporte pas predict_proba()")
+        raise AttributeError("This model does not support predict_proba()")
     
     # =========================================================================
     # SAVE / LOAD
@@ -463,25 +463,25 @@ class ModelML:
         """
         Save model and hyperparameters. 
         
-        :param filename:  Name of the file (auto-generated if None)
+        :param filename: Name of the file (auto-generated if None)
         :param model_dir: Directory to save the model (default: models)
         :param save_params: If True, also save hyperparameters to JSON
         :return: Path where model was saved
         """
         if self.model is None:
-            raise ValueError("Aucun modèle à sauvegarder.")
+            raise ValueError("No model to save.")
         
         os.makedirs(model_dir, exist_ok=True)
         
         if filename is None:
             filename = f"{self.model_name}"
         
-        filename = filename.replace('. pkl', '').replace('.json', '')
+        filename = filename.replace('.pkl', '').replace('.json', '')
         
         # Save model directly in models/ directory
         model_path = os.path.join(model_dir, f"{filename}.pkl")
         joblib.dump(self.model, model_path)
-        print(f"✓ Modèle sauvegardé: {model_path}")
+        print(f"Model saved: {model_path}")
         
         # Save hyperparameters
         if save_params and self.best_params:
@@ -490,11 +490,11 @@ class ModelML:
                 'model_name': self.model_name,
                 'training_date': self.training_date,
                 'hyperparameters': self.best_params,
-                'cv_best_score': self.cv_results. get('best_score') if self.cv_results else None
+                'cv_best_score': self.cv_results.get('best_score') if self.cv_results else None
             }
             with open(params_path, 'w') as f:
                 json.dump(params_to_save, f, indent=4, default=str)
-            print(f"✓ Paramètres sauvegardés: {params_path}")
+            print(f"Parameters saved: {params_path}")
         
         return model_path
     
@@ -502,16 +502,16 @@ class ModelML:
         """
         Load model and hyperparameters.
         
-        : param model_path: Path to the saved model file
-        :param load_params:  If True, also load hyperparameters from JSON
+        :param model_path: Path to the saved model file
+        :param load_params: If True, also load hyperparameters from JSON
         :return: self (for method chaining)
         """
         if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Modèle non trouvé:  {model_path}")
+            raise FileNotFoundError(f"Model not found: {model_path}")
         
         self.model = joblib.load(model_path)
         self.model_name = type(self.model).__name__
-        print(f"✓ Modèle chargé: {model_path}")
+        print(f"Model loaded: {model_path}")
         
         if load_params: 
             params_path = model_path.replace('.pkl', '_params.json')
@@ -521,7 +521,7 @@ class ModelML:
                 self.best_params = params_data.get('hyperparameters')
                 self.training_date = params_data.get('training_date')
                 self.model_name = params_data.get('model_name', self.model_name)
-                print(f"✓ Paramètres chargés: {self.best_params}")
+                print(f"Parameters loaded: {self.best_params}")
         
         return self
     
@@ -538,11 +538,11 @@ class ModelML:
         """
         Get feature importance (for RF and XGBoost).
         
-        : param feature_names: List of feature names (optional)
+        :param feature_names: List of feature names (optional)
         :return: DataFrame with features and their importance
         """
         if self.model is None:
-            raise ValueError("Aucun modèle entraîné.")
+            raise ValueError("No trained model.")
         
         if hasattr(self.model, 'feature_importances_'):
             importances = self.model.feature_importances_
@@ -572,27 +572,27 @@ class ModelML:
             return importance_df
         
         else:
-            raise AttributeError("Ce modèle ne supporte pas feature_importances_ ou coef_")
+            raise AttributeError("This model does not support feature_importances_ or coef_")
     
     def summary(self):
         """Print a summary of the current model state."""
         print("\n" + "=" * 50)
-        print("📋 RÉSUMÉ DU MODÈLE")
+        print("MODEL SUMMARY")
         print("=" * 50)
-        print(f"   Modèle: {self. model_name}")
-        print(f"   Date d'entraînement: {self.training_date}")
-        print(f"   Hyperparamètres: {self.best_params}")
+        print(f"   Model: {self.model_name}")
+        print(f"   Training date: {self.training_date}")
+        print(f"   Hyperparameters: {self.best_params}")
         if self.cv_results:
             print(f"   CV Best Score: {self.cv_results.get('best_score', 'N/A'):.4f}")
         if self.x_train is not None:
-            print(f"   Taille train: {len(self.x_train)}")
+            print(f"   Train size: {len(self.x_train)}")
         if self.x_test is not None:
-            print(f"   Taille test: {len(self.x_test)}")
+            print(f"   Test size: {len(self.x_test)}")
         print("=" * 50)
 
 def find_existing_model(model_dir, model_type):
-    """Cherche un modèle existant du type spécifié."""
-    # Patterns possibles (case-insensitive search)
+    """Find an existing model of the given type."""
+    # Possible patterns (case-insensitive search)
     patterns = [
         os.path.join(model_dir, f"{model_type}*.pkl"),
         os.path.join(model_dir, f"{model_type.lower()}*.pkl"),
@@ -603,10 +603,10 @@ def find_existing_model(model_dir, model_type):
     for pattern in patterns:
         models.extend(glob.glob(pattern))
     
-    # Exclure les fichiers _params.json
+    # Exclude _params.json files
     models = [m for m in models if '_params' not in m]
     
     if models:
-        # Retourner le plus récent
+        # Return the most recent one
         return max(models, key=os.path.getctime)
     return None

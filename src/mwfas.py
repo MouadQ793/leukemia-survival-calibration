@@ -1,3 +1,24 @@
+"""
+Ranking from pairwise comparisons with a Minimum Weight Feedback Arc Set (MWFAS).
+
+The pairwise model gives, for every pair of patients (i, j), a probability that
+patient i dies before patient j. These probabilities define a weighted directed
+graph; removing a minimum-weight set of edges that breaks every cycle yields a
+DAG whose topological order is the final risk ranking.
+
+Also contains helpers for upset losses, synthetic ERO graphs and Kendall tau.
+"""
+import os
+import time
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.sparse as sp
+import torch
+from scipy.stats import rankdata
+
+
 def initialize_graph(edges):
     """
     Converts edge list to an adjacency list and weights dictionary.
@@ -61,7 +82,6 @@ def find_cycles_and_reduce(graph, weights, n):
 
     return removed_edges, removed_weights
 
-from collections import deque
 
 def find_cycle(graph, n):
     """
@@ -262,11 +282,6 @@ def mwfas_synthetic(edges):
     }
 
 
-
-import random
-from collections import defaultdict, deque
-
-
 class DirectedGraph:
     def __init__(self, vertices):
         self.graph = defaultdict(list)
@@ -399,7 +414,6 @@ def graph_to_adjacency_matrix(graph, weights, n):
     :param n: Total number of vertices in the graph.
     :return: An adjacency matrix (n x n) with weights as a PyTorch tensor.
     """
-    import torch
     adjacency_matrix = torch.zeros((n, n), dtype=torch.float32)
 
     for u in graph:
@@ -483,41 +497,6 @@ def calculate_upset_loss(adjacency_matrix, scores, style='ratio', margin=0.01):
         raise ValueError(f"Unsupported style: {style}")
 
     return upset
-def compute_ratio_upset_loss(adjacency_matrix, scores, epsilon=1e-8):
-    """
-    Compute the ratio upset loss for the graph rankings using adjacency matrix and scores.
-
-    :param adjacency_matrix: Torch FloatTensor adjacency matrix (n x n).
-    :param scores: Torch FloatTensor ranking scores (n x 1).
-    :param epsilon: Small value for numerical stability (default: 1e-8).
-    :return: Torch FloatTensor ratio upset loss value.
-    """
-    # Ensure scores are 2D
-    if scores.ndim == 1:
-        scores = scores.view(-1, 1)
-
-    # Skew-symmetric pairwise comparison matrix (M)
-    M1 = adjacency_matrix - adjacency_matrix.T
-
-    # Pairwise score differences (T1)
-    T1 = scores - scores.T
-
-    # Edge mask: Only consider meaningful edges (where M1 != 0)
-    edge_mask = M1 != 0
-
-    # Compute T2 for normalized scores
-    T2 = scores + scores.T + epsilon
-    T = torch.div(T1, T2)
-
-    # Normalize M1 using adjacency matrix
-    M2 = adjacency_matrix + adjacency_matrix.T + epsilon
-    M3 = torch.div(M1, M2)  # Normalize the adjacency matrix
-
-    # Compute ratio upset loss
-    powers = torch.pow((M3 - T)[edge_mask], 2)
-    upset_loss = torch.sum(powers) / torch.sum(edge_mask)
-
-    return upset_loss
 def minimize_ratio_upset_loss(adjacency_matrix, scores, epsilon=1e-2, max_time=120):
     """
     Perform optimization to minimize the ratio upset loss, ensuring naive and simple losses do not worsen.
@@ -527,12 +506,7 @@ def minimize_ratio_upset_loss(adjacency_matrix, scores, epsilon=1e-2, max_time=1
     :param max_time: Maximum time for optimization in seconds.
     :return: Tuple (optimal_scores, minimized_loss)
     """
-    import numpy as np
-    import torch
     from scipy.optimize import minimize
-    import time
-
-    n = adjacency_matrix.shape[0]
 
     # Compute initial losses
     initial_scores = scores.clone().detach().view(-1).numpy()
@@ -614,7 +588,6 @@ def minimize_ratio_upset_loss(adjacency_matrix, scores, epsilon=1e-2, max_time=1
     return optimal_scores, minimized_loss
 
 
-
 def compute_ratio_upset_loss(adjacency_matrix, scores, epsilon=1e-8):
     """
     Compute the ratio upset loss for the graph rankings using adjacency matrix and scores.
@@ -641,10 +614,6 @@ def compute_ratio_upset_loss(adjacency_matrix, scores, epsilon=1e-8):
     upset_loss = torch.sum(powers) / torch.sum(edge_mask)
 
     return upset_loss
-
-import torch
-import matplotlib.pyplot as plt
-import os
 
 
 def plot_ratio_loss(adjacency_matrix, scores, index, lower_bound, upper_bound, steps=100, output_folder="loss_plots"):
@@ -756,12 +725,6 @@ def trinary_search_optimize(adjacency_matrix, scores, index, lower_bound, upper_
     return scores[index]
 
 
-from scipy.optimize import minimize_scalar
-import torch
-
-
-
-
 def minimize_ratio_loss(adjacency_matrix, scores):
     """
     Minimize the ratio upset loss by iteratively optimizing each score using binary search.
@@ -776,7 +739,6 @@ def minimize_ratio_loss(adjacency_matrix, scores):
         sorted_indices = torch.argsort(scores.squeeze())
         print(_)
         for i in range(len(sorted_indices)):
-
 
 
             index = sorted_indices[i]
@@ -798,9 +760,6 @@ def minimize_ratio_loss(adjacency_matrix, scores):
 
 # Example usage
 
-import numpy as np
-import scipy.sparse as sp
-from scipy.stats import rankdata
 
 def generate_ero_graph(n: int, p: float, eta: float, style: str = 'uniform'):
     """
@@ -850,7 +809,6 @@ def generate_ero_graph(n: int, p: float, eta: float, style: str = 'uniform'):
         edge_id += 1
 
     return edges, labels
-
 
 
 def kendall_tau_loss(true_ranking, predicted_ranking):
